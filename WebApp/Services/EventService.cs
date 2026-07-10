@@ -13,16 +13,11 @@ public class EventService : IEventService
     public static List<Event> Events { get; set; } = [];
 
     /// <summary>
-    /// Возвращает все события, если список пустой то ошибка
+    /// Возвращает все события
     /// </summary>
     /// <returns>Список событий</returns>
     public List<Event> GetEvents()
     {
-        if (Events.Count == 0)
-        {
-            throw new InvalidOperationException("События не найдены");
-        }
-
         return Events;
     }
 
