@@ -4,14 +4,12 @@ using WebApp.Services;
 
 namespace WebApp.Controllers;
 
-
 [ApiController]
-[Route("api/[controller]")]
+[Route("events")]
 [Produces("application/json")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
-
 
     public EventsController(IEventService eventService)
     {
