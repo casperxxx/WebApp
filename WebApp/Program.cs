@@ -19,7 +19,7 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
-builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddSingleton<IEventService, EventService>();
 
 var app = builder.Build();
 

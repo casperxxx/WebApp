@@ -22,14 +22,12 @@ public class EventDTO : IValidatableObject
     /// Дата и время начала события
     /// </summary>
     [Required(ErrorMessage = "Требуется дата и время начала события")]
-    [Range(typeof(DateTime), "2026-07-01", "2028-12-31", ErrorMessage = "Некорректная дата начала события")]
     public DateTime StartAt { get; set; }
 
     /// <summary>
     /// Дата и время окончания события
     /// </summary>
     [Required(ErrorMessage = "Требуется дата и время заверешения события")]
-    [Range(typeof(DateTime), "2026-07-01", "2028-12-31", ErrorMessage = "Некорректная дата завершения события")]
     public DateTime EndAt { get; set; }
 
     /// <summary>
@@ -39,10 +37,10 @@ public class EventDTO : IValidatableObject
     /// <returns>Ошибки валидации если даты указаны некорректно</returns>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (EndAt < StartAt)
+        if (EndAt <= StartAt)
         {
             yield return new ValidationResult(
-                "Дата и время завершения события не может быть раньше времени начала.",
+                "Дата и время завершения события должно быть позже времени начала.",
                 [nameof(EndAt), nameof(StartAt)]);
         }
     }

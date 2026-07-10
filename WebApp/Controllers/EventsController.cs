@@ -21,20 +21,11 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <returns>Список событий</returns>
     /// <response code="200">Список событий успешно получен</response>
-    /// <response code="404">События не найдены</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<Event>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<List<Event>> GetAll()
     {
-        try
-        {
-            return Ok(_eventService.GetEvents());
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
+        return Ok(_eventService.GetEvents());
     }
 
     /// <summary>
