@@ -1,12 +1,25 @@
+using System.Reflection;
 using WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new()
+    {
+        Title = "Events API",
+        Version = "v1",
+        Description = "Спринт-1. API для управления событиями"
+    });
 
-builder.Services.AddSingleton<IEventService, EventService>();
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    options.IncludeXmlComments(xmlPath);
+});
+
+builder.Services.AddScoped<IEventService, EventService>();
 
 var app = builder.Build();
 

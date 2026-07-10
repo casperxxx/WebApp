@@ -2,31 +2,55 @@ using WebApp.Models;
 
 namespace WebApp.Services;
 
+/// <summary>
+/// Сервис для работы с событиями
+/// </summary>
 public class EventService : IEventService
 {
-    // Коллекция для хранения событий
+    /// <summary>
+    /// Список всех событий
+    /// </summary>
     public static List<Event> Events { get; set; } = [];
 
-    // Метод получения всех событий
+    /// <summary>
+    /// Возвращает все события, если список пустой то ошибка
+    /// </summary>
+    /// <returns>Список событий</returns>
     public List<Event> GetEvents()
     {
+        if (Events.Count == 0)
+        {
+            throw new InvalidOperationException("События не найдены");
+        }
+
         return Events;
     }
 
-    // Метод получения события по id
+    /// <summary>
+    /// Находит событие по Id
+    /// </summary>
+    /// <param name="id">Id события</param>
+    /// <returns>Событие с таким Id</returns>
     public Event GetEvent(Guid id)
     {
         return Events.First(e => e.Id == id);
     }
 
-    // Метод добавления события
+    /// <summary>
+    /// Добавляет событие в список
+    /// </summary>
+    /// <param name="eventItem">Событие для добавления</param>
     public void AddEvent(Event eventItem)
     {
         eventItem.Id = Guid.NewGuid();
         Events.Add(eventItem);
     }
 
-    // Метод изменения события по id
+    /// <summary>
+    /// Обновляет данные события по Id
+    /// </summary>
+    /// <param name="id">Id события</param>
+    /// <param name="eventItem">Новые данные</param>
     public void UpdateEvent(Guid id, Event eventItem)
     {
         var index = Events.FindIndex(e => e.Id == id);
@@ -34,7 +58,10 @@ public class EventService : IEventService
         Events[index] = eventItem;
     }
 
-    // Метод удаления события по id
+    /// <summary>
+    /// Удаляет событие из списка по Id
+    /// </summary>
+    /// <param name="id">Id события</param>
     public void DeleteEvent(Guid id)
     {
         var eventItem = Events.First(e => e.Id == id);
