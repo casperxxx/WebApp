@@ -1,3 +1,4 @@
+using WebApp.Exceptions;
 using WebApp.Models;
 
 namespace WebApp.Services;
@@ -28,7 +29,13 @@ public class EventService : IEventService
     /// <returns>Событие с таким Id</returns>
     public Event GetEvent(Guid id)
     {
-        return Events.First(e => e.Id == id);
+        var eventItem = Events.FirstOrDefault(e => e.Id == id);
+        if (eventItem is null)
+        {
+            throw new NotFoundException($"Событие с id {id} не найдено");
+        }
+
+        return eventItem;
     }
 
     /// <summary>
@@ -49,6 +56,11 @@ public class EventService : IEventService
     public void UpdateEvent(Guid id, Event eventItem)
     {
         var index = Events.FindIndex(e => e.Id == id);
+        if (index == -1)
+        {
+            throw new NotFoundException($"Событие с id {id} не найдено");
+        }
+
         eventItem.Id = id;
         Events[index] = eventItem;
     }
@@ -59,7 +71,12 @@ public class EventService : IEventService
     /// <param name="id">Id события</param>
     public void DeleteEvent(Guid id)
     {
-        var eventItem = Events.First(e => e.Id == id);
+        var eventItem = Events.FirstOrDefault(e => e.Id == id);
+        if (eventItem is null)
+        {
+            throw new NotFoundException($"Событие с id {id} не найдено");
+        }
+
         Events.Remove(eventItem);
     }
 }

@@ -40,14 +40,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult GetById(Guid id)
     {
-        try
-        {
-            return Ok(_eventService.GetEvent(id));
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
+        return Ok(_eventService.GetEvent(id));
     }
 
     /// <summary>
@@ -90,24 +83,17 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult Update(Guid id, EventDTO request)
     {
-        try
+        var eventItem = new Event
         {
-            var eventItem = new Event
-            {
-                Title = request.Title,
-                Description = request.Description,
-                StartAt = request.StartAt,
-                EndAt = request.EndAt
-            };
+            Title = request.Title,
+            Description = request.Description,
+            StartAt = request.StartAt,
+            EndAt = request.EndAt
+        };
 
-            _eventService.UpdateEvent(id, eventItem);
+        _eventService.UpdateEvent(id, eventItem);
 
-            return Ok(eventItem);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return NotFound();
-        }
+        return Ok(eventItem);
     }
 
     /// <summary>
@@ -121,14 +107,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)
     {
-        try
-        {
-            _eventService.DeleteEvent(id);
-            return NoContent();
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
+        _eventService.DeleteEvent(id);
+        return NoContent();
     }
 }
