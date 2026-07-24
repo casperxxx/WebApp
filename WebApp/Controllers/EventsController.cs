@@ -17,15 +17,20 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Получить список всех событий
+    /// Получить список событий с фильтрацией
     /// </summary>
-    /// <returns>Список событий</returns>
+    /// <param name="title">Поиск по названию</param>
+    /// <param name="from">События, которые начинаются не раньше указанной даты</param>
+    /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
     /// <response code="200">Список событий успешно получен</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<Event>), StatusCodes.Status200OK)]
-    public ActionResult<List<Event>> GetAll()
+    public ActionResult<List<Event>> GetAll(
+        [FromQuery] string? title,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
     {
-        return Ok(_eventService.GetEvents());
+        return Ok(_eventService.GetEvents(title, from, to));
     }
 
     /// <summary>
