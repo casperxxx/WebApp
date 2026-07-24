@@ -1,4 +1,5 @@
 using System.Reflection;
+using WebApp.Middleware;
 using WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +12,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Events API",
         Version = "v1",
-        Description = "Спринт-1. API для управления событиями"
+        Description = "Спринт-2. API для управления событиями"
     });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -29,6 +30,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 app.MapControllers();
 
