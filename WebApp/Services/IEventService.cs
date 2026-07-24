@@ -8,10 +8,13 @@ namespace WebApp.Services;
 public interface IEventService
 {
     /// <summary>
-    /// Получить все события из списка
+    /// Получить события с фильтрацией
     /// </summary>
+    /// <param name="title">Поиск по названию</param>
+    /// <param name="from">События, которые начинаются не раньше указанной даты</param>
+    /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
     /// <returns>Список событий</returns>
-    List<Event> GetEvents();
+    List<Event> GetEvents(string? title, DateTime? from, DateTime? to);
 
     /// <summary>
     /// Получить событие по Id

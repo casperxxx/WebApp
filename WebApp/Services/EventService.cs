@@ -14,12 +14,28 @@ public class EventService : IEventService
     public static List<Event> Events { get; set; } = [];
 
     /// <summary>
-    /// Возвращает все события
+    /// Возвращает события с фильтрацией
     /// </summary>
-    /// <returns>Список событий</returns>
-    public List<Event> GetEvents()
+    public List<Event> GetEvents(string? title, DateTime? from, DateTime? to)
     {
-        return Events;
+        var query = Events.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartAt >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(e => e.EndAt <= to.Value);
+        }
+
+        return query.ToList();
     }
 
     /// <summary>
