@@ -17,20 +17,24 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Получить список событий с фильтрацией
+    /// Получить список событий с фильтрацией и пагинацией
     /// </summary>
     /// <param name="title">Поиск по названию</param>
     /// <param name="from">События, которые начинаются не раньше указанной даты</param>
     /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
+    /// <param name="page">Номер страницы</param>
+    /// <param name="pageSize">Количество элементов на странице</param>
     /// <response code="200">Список событий успешно получен</response>
     [HttpGet]
-    [ProducesResponseType(typeof(List<Event>), StatusCodes.Status200OK)]
-    public ActionResult<List<Event>> GetAll(
+    [ProducesResponseType(typeof(PaginatedResultDTO<Event>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResultDTO<Event>> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to)
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(_eventService.GetEvents(title, from, to));
+        return Ok(_eventService.GetEvents(title, from, to, page, pageSize));
     }
 
     /// <summary>

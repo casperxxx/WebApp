@@ -14,9 +14,9 @@ public class EventService : IEventService
     public static List<Event> Events { get; set; } = [];
 
     /// <summary>
-    /// Возвращает события с фильтрацией
+    /// Возвращает события с фильтрацией и пагинацией
     /// </summary>
-    public List<Event> GetEvents(string? title, DateTime? from, DateTime? to)
+    public PaginatedResultDTO<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize)
     {
         var query = Events.AsEnumerable();
 
@@ -35,7 +35,20 @@ public class EventService : IEventService
             query = query.Where(e => e.EndAt <= to.Value);
         }
 
-        return query.ToList();
+        var filtered = query.ToList();
+        var totalCount = filtered.Count;
+        var items = filtered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PaginatedResultDTO<Event>
+        {
+            TotalCount = totalCount,
+            Items = items,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     /// <summary>
