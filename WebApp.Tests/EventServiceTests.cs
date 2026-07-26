@@ -6,11 +6,12 @@ namespace WebApp.Tests;
 
 public class EventServiceTests
 {
-    private readonly EventService _service = new();
+    private readonly InMemoryEventStore _store = new();
+    private readonly EventService _service;
 
     public EventServiceTests()
     {
-        EventService.Events.Clear();
+        _service = new EventService(_store);
     }
 
     private static Event CreateEvent(string title, DateTime startAt, DateTime endAt)
@@ -30,7 +31,7 @@ public class EventServiceTests
 
         _service.AddEvent(eventItem);
 
-        Assert.Single(EventService.Events);
+        Assert.Single(_store.Events);
         Assert.NotEqual(Guid.Empty, eventItem.Id);
     }
 
@@ -78,7 +79,7 @@ public class EventServiceTests
 
         _service.DeleteEvent(eventItem.Id);
 
-        Assert.Empty(EventService.Events);
+        Assert.Empty(_store.Events);
     }
 
     [Fact]
@@ -103,6 +104,47 @@ public class EventServiceTests
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("B", result.Items[0].Title);
+    }
+
+    [Fact]
+    public void GetEvents_FilterByTo()
+    {
+        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = _service.GetEvents(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 10);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("A", result.Items[0].Title);
+    }
+
+    [Fact]
+    public void GetEvents_FilterByFromAndTo()
+    {
+        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 5, 10, 0, 0), new DateTime(2026, 7, 5, 12, 0, 0)));
+        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        _service.AddEvent(CreateEvent("C", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = _service.GetEvents(
+            null,
+            new DateTime(2026, 7, 8, 0, 0, 0),
+            new DateTime(2026, 7, 15, 0, 0, 0),
+            1,
+            10);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("B", result.Items[0].Title);
+    }
+
+    [Fact]
+    public void GetEvents_WhitespaceTitle_Ignored()
+    {
+        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+
+        var result = _service.GetEvents("   ", null, null, 1, 10);
+
+        Assert.Equal(2, result.TotalCount);
     }
 
     [Fact]
@@ -135,6 +177,18 @@ public class EventServiceTests
     }
 
     [Fact]
+    public void GetEvents_InvalidPage()
+    {
+        Assert.Throws<ArgumentException>(() => _service.GetEvents(null, null, null, 0, 10));
+    }
+
+    [Fact]
+    public void GetEvents_InvalidPageSize()
+    {
+        Assert.Throws<ArgumentException>(() => _service.GetEvents(null, null, null, 1, 0));
+    }
+
+    [Fact]
     public void GetEvent_NotFound()
     {
         var id = Guid.NewGuid();
@@ -148,6 +202,12 @@ public class EventServiceTests
         var eventItem = CreateEvent("Test", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
 
         Assert.Throws<NotFoundException>(() => _service.UpdateEvent(Guid.NewGuid(), eventItem));
+    }
+
+    [Fact]
+    public void DeleteEvent_NotFound()
+    {
+        Assert.Throws<NotFoundException>(() => _service.DeleteEvent(Guid.NewGuid()));
     }
 
     [Fact]
