@@ -73,6 +73,8 @@ public class EventService : IEventService
     /// <param name="eventItem">Событие для добавления</param>
     public void AddEvent(Event eventItem)
     {
+        ValidateDates(eventItem);
+
         eventItem.Id = Guid.NewGuid();
         Events.Add(eventItem);
     }
@@ -89,6 +91,8 @@ public class EventService : IEventService
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
+
+        ValidateDates(eventItem);
 
         eventItem.Id = id;
         Events[index] = eventItem;
@@ -107,5 +111,13 @@ public class EventService : IEventService
         }
 
         Events.Remove(eventItem);
+    }
+
+    private static void ValidateDates(Event eventItem)
+    {
+        if (eventItem.EndAt <= eventItem.StartAt)
+        {
+            throw new ArgumentException("Дата и время завершения события должно быть позже времени начала.");
+        }
     }
 }
