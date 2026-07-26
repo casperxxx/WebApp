@@ -1,5 +1,5 @@
 using System.Net;
-using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using WebApp.Exceptions;
 
 namespace WebApp.Middleware;
@@ -28,24 +28,33 @@ public class ExceptionHandlingMiddleware
         }
     }
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var statusCode = exception switch
+        var statusCode = (int)HttpStatusCode.InternalServerError;
+        var title = "Внутренняя ошибка сервера";
+
+        if (exception is NotFoundException)
         {
-            NotFoundException => (int)HttpStatusCode.NotFound,
-            ArgumentException => (int)HttpStatusCode.BadRequest,
-            _ => (int)HttpStatusCode.InternalServerError
+            statusCode = (int)HttpStatusCode.NotFound;
+            title = "Не найдено";
+        }
+        else if (exception is ArgumentException)
+        {
+            statusCode = (int)HttpStatusCode.BadRequest;
+            title = "Некорректный запрос";
+        }
+
+        var problemDetails = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = title,
+            Detail = exception.Message,
+            Instance = context.Request.Path
         };
 
-        var response = new
-        {
-            status = statusCode,
-            message = exception.Message
-        };
-
-        context.Response.ContentType = "application/json";
+        context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
-        return context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        await context.Response.WriteAsJsonAsync(problemDetails);
     }
 }
