@@ -6,7 +6,6 @@ namespace WebApp.Controllers;
 
 [ApiController]
 [Route("events")]
-[Produces("application/json")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
@@ -25,6 +24,7 @@ public class EventsController : ControllerBase
     /// <param name="page">Номер страницы</param>
     /// <param name="pageSize">Количество элементов на странице</param>
     /// <response code="200">Список событий успешно получен</response>
+    /// <response code="400">Ошибка получения списка</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResultDTO<Event>), StatusCodes.Status200OK)]
     public ActionResult<PaginatedResultDTO<Event>> GetAll(
