@@ -8,10 +8,15 @@ namespace WebApp.Services;
 public interface IEventService
 {
     /// <summary>
-    /// Получить все события из списка
+    /// Получить события с фильтрацией и пагинацией
     /// </summary>
-    /// <returns>Список событий</returns>
-    List<Event> GetEvents();
+    /// <param name="title">Поиск по названию</param>
+    /// <param name="from">События, которые начинаются не раньше указанной даты</param>
+    /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
+    /// <param name="page">Номер страницы</param>
+    /// <param name="pageSize">Количество элементов на странице</param>
+    /// <returns>Результат с пагинацией</returns>
+    PaginatedResultDTO<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize);
 
     /// <summary>
     /// Получить событие по Id
