@@ -6,7 +6,6 @@ namespace WebApp.Controllers;
 
 [ApiController]
 [Route("events")]
-[Produces("application/json")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
@@ -17,15 +16,25 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Получить список всех событий
+    /// Получить список событий с фильтрацией и пагинацией
     /// </summary>
-    /// <returns>Список событий</returns>
+    /// <param name="title">Поиск по названию</param>
+    /// <param name="from">События, которые начинаются не раньше указанной даты</param>
+    /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
+    /// <param name="page">Номер страницы</param>
+    /// <param name="pageSize">Количество элементов на странице</param>
     /// <response code="200">Список событий успешно получен</response>
+    /// <response code="400">Ошибка получения списка</response>
     [HttpGet]
-    [ProducesResponseType(typeof(List<Event>), StatusCodes.Status200OK)]
-    public ActionResult<List<Event>> GetAll()
+    [ProducesResponseType(typeof(PaginatedResultDTO<Event>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResultDTO<Event>> GetAll(
+        [FromQuery] string? title,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(_eventService.GetEvents());
+        return Ok(_eventService.GetEvents(title, from, to, page, pageSize));
     }
 
     /// <summary>
@@ -40,14 +49,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult GetById(Guid id)
     {
-        try
-        {
-            return Ok(_eventService.GetEvent(id));
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
+        return Ok(_eventService.GetEvent(id));
     }
 
     /// <summary>
@@ -90,24 +92,17 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult Update(Guid id, EventDTO request)
     {
-        try
+        var eventItem = new Event
         {
-            var eventItem = new Event
-            {
-                Title = request.Title,
-                Description = request.Description,
-                StartAt = request.StartAt,
-                EndAt = request.EndAt
-            };
+            Title = request.Title,
+            Description = request.Description,
+            StartAt = request.StartAt,
+            EndAt = request.EndAt
+        };
 
-            _eventService.UpdateEvent(id, eventItem);
+        _eventService.UpdateEvent(id, eventItem);
 
-            return Ok(eventItem);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return NotFound();
-        }
+        return Ok(eventItem);
     }
 
     /// <summary>
@@ -121,14 +116,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)
     {
-        try
-        {
-            _eventService.DeleteEvent(id);
-            return NoContent();
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
+        _eventService.DeleteEvent(id);
+        return NoContent();
     }
 }
