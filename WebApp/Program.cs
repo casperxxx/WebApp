@@ -45,6 +45,8 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddSingleton<IEventStore, InMemoryEventStore>();
 builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddSingleton<IBookingStore, InMemoryBookingStore>();
+builder.Services.AddScoped<IBookingService, BookingService>();
 
 var app = builder.Build();
 
