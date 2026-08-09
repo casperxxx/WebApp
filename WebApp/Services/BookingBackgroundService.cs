@@ -2,6 +2,9 @@ using WebApp.Models;
 
 namespace WebApp.Services;
 
+/// <summary>
+/// Фоновая обработка броней: Pending -> Confirmed
+/// </summary>
 public class BookingBackgroundService : BackgroundService
 {
     private readonly IBookingStore _bookingStore;
@@ -25,6 +28,7 @@ public class BookingBackgroundService : BackgroundService
 
                 foreach (var booking in pendingBookings)
                 {
+                    // имитация обращения к внешней системе
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
 
                     booking.Status = BookingStatus.Confirmed;

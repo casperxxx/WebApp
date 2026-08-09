@@ -4,6 +4,7 @@ using WebApp.Services;
 
 namespace WebApp.Tests;
 
+// Тесты для BookingService
 public class BookingServiceTests
 {
     private readonly InMemoryEventStore _eventStore = new();
@@ -17,6 +18,7 @@ public class BookingServiceTests
         _bookingService = new BookingService(_bookingStore, _eventStore);
     }
 
+    // вспомогательный метод — добавляет событие в store
     private Event AddEvent(string title = "Тест")
     {
         var eventItem = new Event
@@ -30,6 +32,7 @@ public class BookingServiceTests
         return eventItem;
     }
 
+    // успешное создание брони — статус должен быть Pending
     [Fact]
     public async Task CreateBooking_ForExistingEvent_ReturnsPending()
     {
@@ -44,6 +47,7 @@ public class BookingServiceTests
         Assert.Single(_bookingStore.Bookings);
     }
 
+    // несколько броней на одно событие — у всех разные Id
     [Fact]
     public async Task CreateBooking_MultipleForSameEvent_UniqueIds()
     {
@@ -61,6 +65,7 @@ public class BookingServiceTests
         Assert.All(_bookingStore.Bookings, b => Assert.Equal(BookingStatus.Pending, b.Status));
     }
 
+    // получение брони по Id
     [Fact]
     public async Task GetBookingById_ReturnsCorrectBooking()
     {
@@ -74,6 +79,7 @@ public class BookingServiceTests
         Assert.Equal(BookingStatus.Pending, booking.Status);
     }
 
+    // после Confirm get должен вернуть новый статус
     [Fact]
     public async Task GetBookingById_ReflectsConfirmedStatus()
     {
@@ -89,6 +95,7 @@ public class BookingServiceTests
         Assert.NotNull(booking.ProcessedAt);
     }
 
+    // то же самое для Rejected
     [Fact]
     public async Task GetBookingById_ReflectsRejectedStatus()
     {
@@ -104,6 +111,7 @@ public class BookingServiceTests
         Assert.NotNull(booking.ProcessedAt);
     }
 
+    // событие не существует
     [Fact]
     public async Task CreateBooking_EventNotFound()
     {
@@ -111,6 +119,7 @@ public class BookingServiceTests
             () => _bookingService.CreateBookingAsync(Guid.NewGuid()));
     }
 
+    // событие удалили — бронировать уже нельзя
     [Fact]
     public async Task CreateBooking_DeletedEvent_NotFound()
     {
@@ -121,6 +130,7 @@ public class BookingServiceTests
             () => _bookingService.CreateBookingAsync(eventItem.Id));
     }
 
+    // брони с таким Id нет
     [Fact]
     public async Task GetBookingById_NotFound()
     {

@@ -3,6 +3,9 @@ using WebApp.Models;
 
 namespace WebApp.Services;
 
+/// <summary>
+/// Сервис для работы с бронированиями
+/// </summary>
 public class BookingService : IBookingService
 {
     private readonly IBookingStore _bookingStore;
@@ -14,6 +17,9 @@ public class BookingService : IBookingService
         _eventStore = eventStore;
     }
 
+    /// <summary>
+    /// Создаёт бронь в статусе Pending
+    /// </summary>
     public Task<Booking> CreateBookingAsync(Guid eventId)
     {
         var eventItem = _eventStore.Events.FirstOrDefault(e => e.Id == eventId);
@@ -36,6 +42,9 @@ public class BookingService : IBookingService
         return Task.FromResult(booking);
     }
 
+    /// <summary>
+    /// Возвращает бронь по Id
+    /// </summary>
     public Task<Booking> GetBookingByIdAsync(Guid bookingId)
     {
         var booking = _bookingStore.Bookings.FirstOrDefault(b => b.Id == bookingId);
