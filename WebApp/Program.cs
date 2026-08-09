@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Middleware;
 using WebApp.Services;
@@ -6,6 +7,10 @@ using WebApp.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
@@ -35,7 +40,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Events API",
         Version = "v1",
-        Description = "Спринт-2. API для управления событиями"
+        Description = "Спринт-3. API для управления событиями и бронями"
     });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -45,6 +50,9 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddSingleton<IEventStore, InMemoryEventStore>();
 builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddSingleton<IBookingStore, InMemoryBookingStore>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddHostedService<BookingBackgroundService>();
 
 var app = builder.Build();
 
