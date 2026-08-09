@@ -9,10 +9,12 @@ namespace WebApp.Controllers;
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
 
-    public EventsController(IEventService eventService)
+    public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
+        _bookingService = bookingService;
     }
 
     /// <summary>
@@ -118,5 +120,14 @@ public class EventsController : ControllerBase
     {
         _eventService.DeleteEvent(id);
         return NoContent();
+    }
+
+    [HttpPost("{id}/book")]
+    [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<Booking>> Book(Guid id)
+    {
+        var booking = await _bookingService.CreateBookingAsync(id);
+        return Accepted($"/bookings/{booking.Id}", booking);
     }
 }
