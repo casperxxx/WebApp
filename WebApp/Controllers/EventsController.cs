@@ -122,6 +122,12 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Создать бронь на событие
+    /// </summary>
+    /// <param name="id">Id события</param>
+    /// <response code="202">Бронь создана, обработка ещё идёт</response>
+    /// <response code="404">Событие не найдено</response>
     [HttpPost("{id}/book")]
     [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
