@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Exceptions;
@@ -43,7 +44,7 @@ public class ExceptionHandlingMiddleware
             title = "Не найдено";
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.5";
         }
-        else if (exception is ArgumentException)
+        else if (exception is ArgumentException or ValidationException)
         {
             statusCode = (int)HttpStatusCode.BadRequest;
             title = "Некорректный запрос";

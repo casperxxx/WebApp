@@ -32,6 +32,11 @@ public interface IEventService
     void AddEvent(Event eventItem);
 
     /// <summary>
+    /// Создать событие из DTO
+    /// </summary>
+    Task<Event> CreateEventAsync(EventDTO request);
+
+    /// <summary>
     /// Изменить событие по id
     /// </summary>
     /// <param name="id">Id события</param>
