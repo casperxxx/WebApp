@@ -8,6 +8,7 @@ namespace WebApp.Services;
 /// </summary>
 public class BookingService : IBookingService
 {
+    private readonly object _bookingLock = new();
     private readonly IBookingStore _bookingStore;
     private readonly IEventStore _eventStore;
 
@@ -22,24 +23,32 @@ public class BookingService : IBookingService
     /// </summary>
     public Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        var eventItem = _eventStore.Events.FirstOrDefault(e => e.Id == eventId);
-        if (eventItem is null)
+        lock (_bookingLock)
         {
-            throw new NotFoundException($"Событие с id {eventId} не найдено");
+            var eventItem = _eventStore.Events.FirstOrDefault(e => e.Id == eventId);
+            if (eventItem is null)
+            {
+                throw new NotFoundException($"Событие с id {eventId} не найдено");
+            }
+
+            if (!eventItem.TryReserveSeats())
+            {
+                throw new NoAvailableSeatsException("No available seats for this event");
+            }
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Status = BookingStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                ProcessedAt = null
+            };
+
+            _bookingStore.Bookings.Add(booking);
+
+            return Task.FromResult(booking);
         }
-
-        var booking = new Booking
-        {
-            Id = Guid.NewGuid(),
-            EventId = eventId,
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            ProcessedAt = null
-        };
-
-        _bookingStore.Bookings.Add(booking);
-
-        return Task.FromResult(booking);
     }
 
     /// <summary>
