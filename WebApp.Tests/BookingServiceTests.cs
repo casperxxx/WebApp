@@ -19,16 +19,16 @@ public class BookingServiceTests
     }
 
     // вспомогательный метод — добавляет событие в store
-    private Event AddEvent(string title = "Тест")
+    private Event AddEvent(string title = "Тест", int totalSeats = 10)
     {
-        var eventItem = new Event
-        {
-            Title = title,
-            StartAt = new DateTime(2026, 8, 10, 10, 0, 0),
-            EndAt = new DateTime(2026, 8, 10, 12, 0, 0)
-        };
+        var eventItem = Event.Create(
+            title,
+            null,
+            new DateTime(2026, 8, 10, 10, 0, 0),
+            new DateTime(2026, 8, 10, 12, 0, 0),
+            totalSeats);
 
-        _eventService.AddEvent(eventItem);
+        _eventStore.Events.Add(eventItem);
         return eventItem;
     }
 

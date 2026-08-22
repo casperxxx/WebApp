@@ -123,6 +123,7 @@ public class EventsController : ControllerBase
     [HttpPost("{id}/book")]
     [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<Booking>> Book(Guid id)
     {
         var booking = await _bookingService.CreateBookingAsync(id);
