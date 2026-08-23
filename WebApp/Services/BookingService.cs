@@ -33,7 +33,7 @@ public class BookingService : IBookingService
 
             if (!eventItem.TryReserveSeats())
             {
-                throw new NoAvailableSeatsException("No available seats for this event");
+                throw new NoAvailableSeatsException($"Нет свободных мест для события {eventItem.Title} c id:{eventId}");
             }
 
             var booking = new Booking

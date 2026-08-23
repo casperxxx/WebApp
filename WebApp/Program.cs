@@ -40,7 +40,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Events API",
         Version = "v1",
-        Description = "Спринт-3. API для управления событиями и бронями"
+        Description = "Спринт-4. API для управления событиями и бронями"
     });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
