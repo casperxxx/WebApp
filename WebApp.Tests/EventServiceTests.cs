@@ -14,13 +14,15 @@ public class EventServiceTests
         _service = new EventService(_store);
     }
 
-    private static Event CreateEvent(string title, DateTime startAt, DateTime endAt)
+    private static Event CreateEvent(string title, DateTime startAt, DateTime endAt, int totalSeats = 10)
     {
         return new Event
         {
             Title = title,
             StartAt = startAt,
-            EndAt = endAt
+            EndAt = endAt,
+            TotalSeats = totalSeats,
+            AvailableSeats = totalSeats
         };
     }
 
@@ -33,6 +35,25 @@ public class EventServiceTests
 
         Assert.Single(_store.Events);
         Assert.NotEqual(Guid.Empty, eventItem.Id);
+    }
+
+    [Fact]
+    public async Task CreateEventAsync_SetsTotalAndAvailableSeats()
+    {
+        var request = new EventDTO
+        {
+            Title = "Концерт",
+            Description = "Тест",
+            StartAt = new DateTime(2026, 7, 10, 10, 0, 0),
+            EndAt = new DateTime(2026, 7, 10, 12, 0, 0),
+            TotalSeats = 25
+        };
+
+        var created = await _service.CreateEventAsync(request);
+
+        Assert.Equal(25, created.TotalSeats);
+        Assert.Equal(25, created.AvailableSeats);
+        Assert.Single(_store.Events);
     }
 
     [Fact]
