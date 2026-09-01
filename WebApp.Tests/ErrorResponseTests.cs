@@ -67,4 +67,36 @@ public class ErrorResponseTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(body.TryGetProperty("errors", out _));
         Assert.True(body.TryGetProperty("traceId", out _));
     }
+
+    [Fact]
+    public async Task Book_NoSeats_ReturnsConflictProblemJson()
+    {
+        var createJson = """
+            {
+              "title": "Концерт",
+              "startAt": "2026-08-10T10:00:00",
+              "endAt": "2026-08-10T12:00:00",
+              "totalSeats": 1
+            }
+            """;
+        var createResponse = await _client.PostAsync(
+            "/events",
+            new StringContent(createJson, Encoding.UTF8, "application/json"));
+        createResponse.EnsureSuccessStatusCode();
+
+        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var firstBook = await _client.PostAsync($"/events/{eventId}/book", null);
+        Assert.Equal(HttpStatusCode.Accepted, firstBook.StatusCode);
+
+        var secondBook = await _client.PostAsync($"/events/{eventId}/book", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, secondBook.StatusCode);
+        Assert.Equal("application/problem+json", secondBook.Content.Headers.ContentType?.MediaType);
+
+        var body = await secondBook.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(409, body.GetProperty("status").GetInt32());
+        Assert.True(body.TryGetProperty("traceId", out _));
+    }
 }

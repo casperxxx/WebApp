@@ -64,18 +64,9 @@ public class EventsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(Event), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult Create(EventDTO request)
+    public async Task<ActionResult> Create(EventDTO request)
     {
-        var eventItem = new Event
-        {
-            Title = request.Title,
-            Description = request.Description,
-            StartAt = request.StartAt,
-            EndAt = request.EndAt
-        };
-
-        _eventService.AddEvent(eventItem);
-
+        var eventItem = await _eventService.CreateEventAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = eventItem.Id }, eventItem);
     }
 
@@ -99,12 +90,13 @@ public class EventsController : ControllerBase
             Title = request.Title,
             Description = request.Description,
             StartAt = request.StartAt,
-            EndAt = request.EndAt
+            EndAt = request.EndAt,
+            TotalSeats = request.TotalSeats ?? 0
         };
 
         _eventService.UpdateEvent(id, eventItem);
 
-        return Ok(eventItem);
+        return Ok(_eventService.GetEvent(id));
     }
 
     /// <summary>
@@ -131,6 +123,7 @@ public class EventsController : ControllerBase
     [HttpPost("{id}/book")]
     [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<Booking>> Book(Guid id)
     {
         var booking = await _bookingService.CreateBookingAsync(id);
