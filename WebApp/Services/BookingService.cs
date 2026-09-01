@@ -36,14 +36,7 @@ public class BookingService : IBookingService
                 throw new NoAvailableSeatsException($"Нет свободных мест для события {eventItem.Title} c id:{eventId}");
             }
 
-            var booking = new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = eventId,
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                ProcessedAt = null
-            };
+            var booking = Booking.CreatePending(eventId);
 
             _bookingStore.Bookings.Add(booking);
 

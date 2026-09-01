@@ -5,6 +5,10 @@ namespace WebApp.Models;
 /// </summary>
 public class Booking
 {
+    private Booking()
+    {
+    }
+
     /// <summary>
     /// Id брони
     /// </summary>
@@ -14,6 +18,11 @@ public class Booking
     /// Id события, к которому относится бронь
     /// </summary>
     public Guid EventId { get; set; }
+
+    /// <summary>
+    /// Событие, к которому относится бронь
+    /// </summary>
+    public Event? Event { get; set; }
 
     /// <summary>
     /// Текущий статус брони
@@ -29,6 +38,21 @@ public class Booking
     /// Дата и время обработки брони
     /// </summary>
     public DateTime? ProcessedAt { get; set; }
+
+    /// <summary>
+    /// Создаёт бронь в статусе Pending
+    /// </summary>
+    public static Booking CreatePending(Guid eventId)
+    {
+        return new Booking
+        {
+            Id = Guid.NewGuid(),
+            EventId = eventId,
+            Status = BookingStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            ProcessedAt = null
+        };
+    }
 
     /// <summary>
     /// Подтвердить бронь
