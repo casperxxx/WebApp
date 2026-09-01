@@ -107,6 +107,25 @@ public class EventService : IEventService
     }
 
     /// <summary>
+    /// Создаёт событие через Event.Create
+    /// </summary>
+    public Task<Event> CreateEventAsync(EventDTO request)
+    {
+        var totalSeats = request.TotalSeats ?? 0;
+        var eventItem = Event.Create(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            totalSeats);
+
+        ValidateDates(eventItem);
+        _store.Events.Add(eventItem);
+
+        return Task.FromResult(eventItem);
+    }
+
+    /// <summary>
     /// Обновляет данные события по Id
     /// </summary>
     /// <param name="id">Id события</param>
@@ -121,8 +140,17 @@ public class EventService : IEventService
 
         ValidateDates(eventItem);
 
-        eventItem.Id = id;
-        _store.Events[index] = eventItem;
+        var existing = _store.Events[index];
+        var reservedSeats = existing.TotalSeats - existing.AvailableSeats;
+        var totalSeats = eventItem.TotalSeats > 0 ? eventItem.TotalSeats : existing.TotalSeats;
+
+        existing.Title = eventItem.Title;
+        existing.Description = eventItem.Description;
+        existing.StartAt = eventItem.StartAt;
+        existing.EndAt = eventItem.EndAt;
+        existing.TotalSeats = totalSeats;
+        // не затираем уже занятые места
+        existing.AvailableSeats = Math.Max(0, totalSeats - reservedSeats);
     }
 
     /// <summary>

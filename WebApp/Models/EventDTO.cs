@@ -31,6 +31,12 @@ public class EventDTO : IValidatableObject
     public DateTime EndAt { get; set; }
 
     /// <summary>
+    /// Сколько всего мест на событии
+    /// </summary>
+    [Required(ErrorMessage = "Требуется указать количество мест")]
+    public int? TotalSeats { get; set; }
+
+    /// <summary>
     /// Проверка корректности укзания дат и времени
     /// </summary>
     /// <param name="validationContext">Валидация</param>
@@ -42,6 +48,13 @@ public class EventDTO : IValidatableObject
             yield return new ValidationResult(
                 "Дата и время завершения события должно быть позже времени начала.",
                 [nameof(EndAt), nameof(StartAt)]);
+        }
+
+        if (TotalSeats is null || TotalSeats <= 0)
+        {
+            yield return new ValidationResult(
+                "TotalSeats должно быть больше нуля",
+                [nameof(TotalSeats)]);
         }
     }
 }
