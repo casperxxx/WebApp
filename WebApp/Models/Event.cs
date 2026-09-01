@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace WebApp.Models;
 
@@ -51,6 +52,7 @@ public class Event
     /// <summary>
     /// Брони на это событие
     /// </summary>
+    [JsonIgnore]
     public ICollection<Booking> Bookings { get; private set; }
 
     /// <summary>

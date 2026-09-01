@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
 
@@ -6,26 +8,26 @@ namespace WebApp.Services;
 /// <summary>
 /// Сервис для работы с бронированиями
 /// </summary>
-public class BookingService : IBookingService
+internal class BookingService : IBookingService
 {
-    private readonly object _bookingLock = new();
-    private readonly IBookingStore _bookingStore;
-    private readonly IEventStore _eventStore;
+    private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    public BookingService(IBookingStore bookingStore, IEventStore eventStore)
+    private readonly AppDbContext _context;
+
+    public BookingService(AppDbContext context)
     {
-        _bookingStore = bookingStore;
-        _eventStore = eventStore;
+        _context = context;
     }
 
     /// <summary>
     /// Создаёт бронь в статусе Pending
     /// </summary>
-    public Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        lock (_bookingLock)
+        await BookingLock.WaitAsync();
+        try
         {
-            var eventItem = _eventStore.Events.FirstOrDefault(e => e.Id == eventId);
+            var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
             if (eventItem is null)
             {
                 throw new NotFoundException($"Событие с id {eventId} не найдено");
@@ -37,24 +39,28 @@ public class BookingService : IBookingService
             }
 
             var booking = Booking.CreatePending(eventId);
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
 
-            _bookingStore.Bookings.Add(booking);
-
-            return Task.FromResult(booking);
+            return booking;
+        }
+        finally
+        {
+            BookingLock.Release();
         }
     }
 
     /// <summary>
     /// Возвращает бронь по Id
     /// </summary>
-    public Task<Booking> GetBookingByIdAsync(Guid bookingId)
+    public async Task<Booking> GetBookingByIdAsync(Guid bookingId)
     {
-        var booking = _bookingStore.Bookings.FirstOrDefault(b => b.Id == bookingId);
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
         if (booking is null)
         {
             throw new NotFoundException($"Бронь с id {bookingId} не найдена");
         }
 
-        return Task.FromResult(booking);
+        return booking;
     }
 }
