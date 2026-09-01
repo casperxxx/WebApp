@@ -16,14 +16,7 @@ public class EventServiceTests
 
     private static Event CreateEvent(string title, DateTime startAt, DateTime endAt, int totalSeats = 10)
     {
-        return new Event
-        {
-            Title = title,
-            StartAt = startAt,
-            EndAt = endAt,
-            TotalSeats = totalSeats,
-            AvailableSeats = totalSeats
-        };
+        return Event.Create(title, null, startAt, endAt, totalSeats);
     }
 
     [Fact]

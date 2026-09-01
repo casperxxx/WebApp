@@ -85,14 +85,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult Update(Guid id, EventDTO request)
     {
-        var eventItem = new Event
-        {
-            Title = request.Title,
-            Description = request.Description,
-            StartAt = request.StartAt,
-            EndAt = request.EndAt,
-            TotalSeats = request.TotalSeats ?? 0
-        };
+        var eventItem = Event.FromUpdate(request);
 
         _eventService.UpdateEvent(id, eventItem);
 
