@@ -29,14 +29,14 @@ public class EventsController : ControllerBase
     /// <response code="400">Ошибка получения списка</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResultDTO<Event>), StatusCodes.Status200OK)]
-    public ActionResult<PaginatedResultDTO<Event>> GetAll(
+    public async Task<ActionResult<PaginatedResultDTO<Event>>> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        return Ok(_eventService.GetEvents(title, from, to, page, pageSize));
+        return Ok(await _eventService.GetEventsAsync(title, from, to, page, pageSize));
     }
 
     /// <summary>
@@ -49,9 +49,9 @@ public class EventsController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult GetById(Guid id)
+    public async Task<ActionResult> GetById(Guid id)
     {
-        return Ok(_eventService.GetEvent(id));
+        return Ok(await _eventService.GetEventAsync(id));
     }
 
     /// <summary>
@@ -83,13 +83,13 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult Update(Guid id, EventDTO request)
+    public async Task<ActionResult> Update(Guid id, EventDTO request)
     {
         var eventItem = Event.FromUpdate(request);
 
-        _eventService.UpdateEvent(id, eventItem);
+        var updated = await _eventService.UpdateEventAsync(id, eventItem);
 
-        return Ok(_eventService.GetEvent(id));
+        return Ok(updated);
     }
 
     /// <summary>
@@ -101,9 +101,9 @@ public class EventsController : ControllerBase
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        _eventService.DeleteEvent(id);
+        await _eventService.DeleteEventAsync(id);
         return NoContent();
     }
 
