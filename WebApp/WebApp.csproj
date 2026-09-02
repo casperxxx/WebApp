@@ -13,4 +13,8 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="WebApp.Tests" />
+  </ItemGroup>
+
 </Project>
