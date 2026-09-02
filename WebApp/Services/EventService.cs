@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
 
@@ -6,29 +8,28 @@ namespace WebApp.Services;
 /// <summary>
 /// Сервис для работы с событиями
 /// </summary>
-public class EventService : IEventService
+internal class EventService : IEventService
 {
-    private readonly IEventStore _store;
+    private readonly AppDbContext _context;
 
     /// <summary>
-    /// Создаёт сервис и получает хранилище через DI
+    /// Создаёт сервис и получает контекст БД через DI
     /// </summary>
-    /// <param name="store">Хранилище событий</param>
-    public EventService(IEventStore store)
+    /// <param name="context">Контекст базы данных</param>
+    public EventService(AppDbContext context)
     {
-        _store = store;
+        _context = context;
     }
 
     /// <summary>
     /// Возвращает события с фильтрацией и пагинацией
     /// </summary>
-    /// <param name="title">Поиск по названию</param>
-    /// <param name="from">События, которые начинаются не раньше указанной даты</param>
-    /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
-    /// <param name="page">Номер страницы</param>
-    /// <param name="pageSize">Количество элементов на странице</param>
-    /// <returns>Результат с пагинацией</returns>
-    public PaginatedResultDTO<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize)
+    public async Task<PaginatedResultDTO<Event>> GetEventsAsync(
+        string? title,
+        DateTime? from,
+        DateTime? to,
+        int page,
+        int pageSize)
     {
         if (page < 1)
         {
@@ -45,11 +46,12 @@ public class EventService : IEventService
             throw new ArgumentException("pageSize должен быть <= 100");
         }
 
-        var query = _store.Events.AsEnumerable();
+        var query = _context.Events.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(title))
         {
-            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+            var titleLower = title.ToLower();
+            query = query.Where(e => e.Title.ToLower().Contains(titleLower));
         }
 
         if (from.HasValue)
@@ -62,12 +64,11 @@ public class EventService : IEventService
             query = query.Where(e => e.EndAt <= to.Value);
         }
 
-        var filtered = query.ToList();
-        var totalCount = filtered.Count;
-        var items = filtered
+        var totalCount = await query.CountAsync();
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
         return new PaginatedResultDTO<Event>
         {
@@ -81,11 +82,9 @@ public class EventService : IEventService
     /// <summary>
     /// Находит событие по Id
     /// </summary>
-    /// <param name="id">Id события</param>
-    /// <returns>Событие с таким Id</returns>
-    public Event GetEvent(Guid id)
+    public async Task<Event> GetEventAsync(Guid id)
     {
-        var eventItem = _store.Events.FirstOrDefault(e => e.Id == id);
+        var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
@@ -95,21 +94,9 @@ public class EventService : IEventService
     }
 
     /// <summary>
-    /// Добавляет событие в список
-    /// </summary>
-    /// <param name="eventItem">Событие для добавления</param>
-    public void AddEvent(Event eventItem)
-    {
-        ValidateDates(eventItem);
-
-        eventItem.Id = Guid.NewGuid();
-        _store.Events.Add(eventItem);
-    }
-
-    /// <summary>
     /// Создаёт событие через Event.Create
     /// </summary>
-    public Task<Event> CreateEventAsync(EventDTO request)
+    public async Task<Event> CreateEventAsync(EventDTO request)
     {
         var totalSeats = request.TotalSeats ?? 0;
         var eventItem = Event.Create(
@@ -120,27 +107,25 @@ public class EventService : IEventService
             totalSeats);
 
         ValidateDates(eventItem);
-        _store.Events.Add(eventItem);
+        _context.Events.Add(eventItem);
+        await _context.SaveChangesAsync();
 
-        return Task.FromResult(eventItem);
+        return eventItem;
     }
 
     /// <summary>
     /// Обновляет данные события по Id
     /// </summary>
-    /// <param name="id">Id события</param>
-    /// <param name="eventItem">Новые данные</param>
-    public void UpdateEvent(Guid id, Event eventItem)
+    public async Task<Event> UpdateEventAsync(Guid id, Event eventItem)
     {
-        var index = _store.Events.FindIndex(e => e.Id == id);
-        if (index == -1)
+        var existing = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        if (existing is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
         ValidateDates(eventItem);
 
-        var existing = _store.Events[index];
         var reservedSeats = existing.TotalSeats - existing.AvailableSeats;
         var totalSeats = eventItem.TotalSeats > 0 ? eventItem.TotalSeats : existing.TotalSeats;
 
@@ -151,21 +136,25 @@ public class EventService : IEventService
         existing.TotalSeats = totalSeats;
         // не затираем уже занятые места
         existing.AvailableSeats = Math.Max(0, totalSeats - reservedSeats);
+
+        await _context.SaveChangesAsync();
+
+        return existing;
     }
 
     /// <summary>
     /// Удаляет событие из списка по Id
     /// </summary>
-    /// <param name="id">Id события</param>
-    public void DeleteEvent(Guid id)
+    public async Task DeleteEventAsync(Guid id)
     {
-        var eventItem = _store.Events.FirstOrDefault(e => e.Id == id);
+        var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        _store.Events.Remove(eventItem);
+        _context.Events.Remove(eventItem);
+        await _context.SaveChangesAsync();
     }
 
     private static void ValidateDates(Event eventItem)

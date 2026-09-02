@@ -1,4 +1,4 @@
-using WebApp.Models;
+﻿using WebApp.Models;
 
 namespace WebApp.Services;
 
@@ -16,24 +16,25 @@ public interface IEventService
     /// <param name="page">Номер страницы</param>
     /// <param name="pageSize">Количество элементов на странице</param>
     /// <returns>Результат с пагинацией</returns>
-    PaginatedResultDTO<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize);
+    Task<PaginatedResultDTO<Event>> GetEventsAsync(
+        string? title,
+        DateTime? from,
+        DateTime? to,
+        int page,
+        int pageSize);
 
     /// <summary>
     /// Получить событие по Id
     /// </summary>
     /// <param name="id">Id события</param>
     /// <returns>Найденное событие</returns>
-    Event GetEvent(Guid id);
-
-    /// <summary>
-    /// Добавить новое событие в список
-    /// </summary>
-    /// <param name="eventItem">Событие которое добавляем</param>
-    void AddEvent(Event eventItem);
+    Task<Event> GetEventAsync(Guid id);
 
     /// <summary>
     /// Создать событие из DTO
     /// </summary>
+    /// <param name="request">Данные для создания события</param>
+    /// <returns>Созданное событие</returns>
     Task<Event> CreateEventAsync(EventDTO request);
 
     /// <summary>
@@ -41,11 +42,12 @@ public interface IEventService
     /// </summary>
     /// <param name="id">Id события</param>
     /// <param name="eventItem">Новые данные события</param>
-    void UpdateEvent(Guid id, Event eventItem);
+    /// <returns>Обновлённое событие</returns>
+    Task<Event> UpdateEventAsync(Guid id, Event eventItem);
 
     /// <summary>
     /// Удалить событие по id
     /// </summary>
     /// <param name="id">Id события</param>
-    void DeleteEvent(Guid id);
+    Task DeleteEventAsync(Guid id);
 }
