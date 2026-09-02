@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace WebApp.Models;
 
@@ -7,6 +8,12 @@ namespace WebApp.Models;
 /// </summary>
 public class Event
 {
+    private Event()
+    {
+        Title = null!;
+        Bookings = [];
+    }
+
     /// <summary>
     /// Id события
     /// </summary>
@@ -41,6 +48,27 @@ public class Event
     /// Сколько мест свободно
     /// </summary>
     public int AvailableSeats { get; set; }
+
+    /// <summary>
+    /// Брони на это событие
+    /// </summary>
+    [JsonIgnore]
+    public ICollection<Booking> Bookings { get; private set; }
+
+    /// <summary>
+    /// Данные для обновления события из DTO
+    /// </summary>
+    public static Event FromUpdate(EventDTO request)
+    {
+        return new Event
+        {
+            Title = request.Title,
+            Description = request.Description,
+            StartAt = request.StartAt,
+            EndAt = request.EndAt,
+            TotalSeats = request.TotalSeats ?? 0
+        };
+    }
 
     /// <summary>
     /// Создаёт событие, AvailableSeats = TotalSeats

@@ -1,152 +1,209 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
 using WebApp.Services;
 
 namespace WebApp.Tests;
 
-public class EventServiceTests
+public class EventServiceTests : IDisposable
 {
-    private readonly InMemoryEventStore _store = new();
-    private readonly EventService _service;
+    private readonly string _dbName = Guid.NewGuid().ToString();
+    private readonly ServiceProvider _serviceProvider;
 
     public EventServiceTests()
     {
-        _service = new EventService(_store);
+        var services = new ServiceCollection();
+        services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_dbName));
+        services.AddScoped<IEventService, EventService>();
+        _serviceProvider = services.BuildServiceProvider();
     }
 
-    private static Event CreateEvent(string title, DateTime startAt, DateTime endAt, int totalSeats = 10)
+    public void Dispose()
     {
-        return new Event
+        _serviceProvider.Dispose();
+    }
+
+    private IEventService CreateService(IServiceScope scope) =>
+        scope.ServiceProvider.GetRequiredService<IEventService>();
+
+    private static EventDTO CreateRequest(
+        string title,
+        DateTime startAt,
+        DateTime endAt,
+        int totalSeats = 10)
+    {
+        return new EventDTO
         {
             Title = title,
+            Description = null,
             StartAt = startAt,
             EndAt = endAt,
-            TotalSeats = totalSeats,
-            AvailableSeats = totalSeats
+            TotalSeats = totalSeats
         };
     }
 
     [Fact]
-    public void AddEvent_CreatesEvent()
+    public async Task CreateEventAsync_CreatesEvent()
     {
-        var eventItem = CreateEvent("Встреча", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        _service.AddEvent(eventItem);
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Встреча",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        Assert.Single(_store.Events);
-        Assert.NotEqual(Guid.Empty, eventItem.Id);
+        Assert.NotEqual(Guid.Empty, created.Id);
+        Assert.Single(context.Events);
     }
 
     [Fact]
     public async Task CreateEventAsync_SetsTotalAndAvailableSeats()
     {
-        var request = new EventDTO
-        {
-            Title = "Концерт",
-            Description = "Тест",
-            StartAt = new DateTime(2026, 7, 10, 10, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 12, 0, 0),
-            TotalSeats = 25
-        };
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var created = await _service.CreateEventAsync(request);
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Концерт",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            totalSeats: 25));
 
         Assert.Equal(25, created.TotalSeats);
         Assert.Equal(25, created.AvailableSeats);
-        Assert.Single(_store.Events);
+        Assert.Single(context.Events);
     }
 
     [Fact]
-    public void GetEvents_ReturnsAll()
+    public async Task GetEventsAsync_ReturnsAll()
     {
-        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents(null, null, null, 1, 10);
+        await service.CreateEventAsync(CreateRequest("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("B", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync(null, null, null, 1, 10);
 
         Assert.Equal(2, result.TotalCount);
         Assert.Equal(2, result.Items.Count);
     }
 
     [Fact]
-    public void GetEvent_ReturnsById()
+    public async Task GetEventAsync_ReturnsById()
     {
-        var eventItem = CreateEvent("Test", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
-        _service.AddEvent(eventItem);
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvent(eventItem.Id);
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Test",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
+
+        var result = await service.GetEventAsync(created.Id);
 
         Assert.Equal("Test", result.Title);
     }
 
     [Fact]
-    public void UpdateEvent_UpdatesExisting()
+    public async Task UpdateEventAsync_UpdatesExisting()
     {
-        var eventItem = CreateEvent("Old", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
-        _service.AddEvent(eventItem);
-        var updated = CreateEvent("New", new DateTime(2026, 7, 10, 11, 0, 0), new DateTime(2026, 7, 10, 13, 0, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        _service.UpdateEvent(eventItem.Id, updated);
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Old",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var result = _service.GetEvent(eventItem.Id);
+        var updated = Event.FromUpdate(CreateRequest(
+            "New",
+            new DateTime(2026, 7, 10, 11, 0, 0),
+            new DateTime(2026, 7, 10, 13, 0, 0)));
+
+        await service.UpdateEventAsync(created.Id, updated);
+
+        var result = await service.GetEventAsync(created.Id);
         Assert.Equal("New", result.Title);
     }
 
     [Fact]
-    public void DeleteEvent_RemovesEvent()
+    public async Task DeleteEventAsync_RemovesEvent()
     {
-        var eventItem = CreateEvent("Delete", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
-        _service.AddEvent(eventItem);
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        _service.DeleteEvent(eventItem.Id);
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Delete",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        Assert.Empty(_store.Events);
+        await service.DeleteEventAsync(created.Id);
+
+        Assert.Empty(context.Events);
     }
 
     [Fact]
-    public void GetEvents_FilterByTitle()
+    public async Task GetEventsAsync_FilterByTitle()
     {
-        _service.AddEvent(CreateEvent("Встреча", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("Концерт", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents("встр", null, null, 1, 10);
+        await service.CreateEventAsync(CreateRequest("Встреча", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("Концерт", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync("встр", null, null, 1, 10);
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("Встреча", result.Items[0].Title);
     }
 
     [Fact]
-    public void GetEvents_FilterByDates()
+    public async Task GetEventsAsync_FilterByDates()
     {
-        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents(null, new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 10);
+        await service.CreateEventAsync(CreateRequest("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync(null, new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 10);
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("B", result.Items[0].Title);
     }
 
     [Fact]
-    public void GetEvents_FilterByTo()
+    public async Task GetEventsAsync_FilterByTo()
     {
-        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 10);
+        await service.CreateEventAsync(CreateRequest("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 10);
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("A", result.Items[0].Title);
     }
 
     [Fact]
-    public void GetEvents_FilterByFromAndTo()
+    public async Task GetEventsAsync_FilterByFromAndTo()
     {
-        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 5, 10, 0, 0), new DateTime(2026, 7, 5, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("C", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents(
+        await service.CreateEventAsync(CreateRequest("A", new DateTime(2026, 7, 5, 10, 0, 0), new DateTime(2026, 7, 5, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("B", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("C", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync(
             null,
             new DateTime(2026, 7, 8, 0, 0, 0),
             new DateTime(2026, 7, 15, 0, 0, 0),
@@ -158,26 +215,35 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WhitespaceTitle_Ignored()
+    public async Task GetEventsAsync_WhitespaceTitle_Ignored()
     {
-        _service.AddEvent(CreateEvent("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("B", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents("   ", null, null, 1, 10);
+        await service.CreateEventAsync(CreateRequest("A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("B", new DateTime(2026, 7, 11, 10, 0, 0), new DateTime(2026, 7, 11, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync("   ", null, null, 1, 10);
 
         Assert.Equal(2, result.TotalCount);
     }
 
     [Fact]
-    public void GetEvents_Pagination()
+    public async Task GetEventsAsync_Pagination()
     {
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+
         for (var i = 1; i <= 15; i++)
         {
-            _service.AddEvent(CreateEvent($"Event {i}", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+            await service.CreateEventAsync(CreateRequest(
+                $"Event {i}",
+                new DateTime(2026, 7, 10, 10, 0, 0),
+                new DateTime(2026, 7, 10, 12, 0, 0)));
         }
 
-        var page1 = _service.GetEvents(null, null, null, 1, 10);
-        var page2 = _service.GetEvents(null, null, null, 2, 10);
+        var page1 = await service.GetEventsAsync(null, null, null, 1, 10);
+        var page2 = await service.GetEventsAsync(null, null, null, 2, 10);
 
         Assert.Equal(15, page1.TotalCount);
         Assert.Equal(10, page1.Items.Count);
@@ -185,67 +251,104 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_CombinedFilters()
+    public async Task GetEventsAsync_CombinedFilters()
     {
-        _service.AddEvent(CreateEvent("Встреча A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("Встреча B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
-        _service.AddEvent(CreateEvent("Концерт", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        var result = _service.GetEvents("встр", new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 10);
+        await service.CreateEventAsync(CreateRequest("Встреча A", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("Встреча B", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+        await service.CreateEventAsync(CreateRequest("Концерт", new DateTime(2026, 7, 20, 10, 0, 0), new DateTime(2026, 7, 20, 12, 0, 0)));
+
+        var result = await service.GetEventsAsync("встр", new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 10);
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("Встреча B", result.Items[0].Title);
     }
 
     [Fact]
-    public void GetEvents_InvalidPage()
+    public async Task GetEventsAsync_InvalidPage()
     {
-        Assert.Throws<ArgumentException>(() => _service.GetEvents(null, null, null, 0, 10));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetEventsAsync(null, null, null, 0, 10));
     }
 
     [Fact]
-    public void GetEvents_InvalidPageSize()
+    public async Task GetEventsAsync_InvalidPageSize()
     {
-        Assert.Throws<ArgumentException>(() => _service.GetEvents(null, null, null, 1, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetEventsAsync(null, null, null, 1, 0));
     }
 
     [Fact]
-    public void GetEvent_NotFound()
+    public async Task GetEventAsync_NotFound()
     {
-        var id = Guid.NewGuid();
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        Assert.Throws<NotFoundException>(() => _service.GetEvent(id));
+        await Assert.ThrowsAsync<NotFoundException>(() => service.GetEventAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void UpdateEvent_NotFound()
+    public async Task UpdateEventAsync_NotFound()
     {
-        var eventItem = CreateEvent("Test", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        Assert.Throws<NotFoundException>(() => _service.UpdateEvent(Guid.NewGuid(), eventItem));
+        var eventItem = Event.FromUpdate(CreateRequest(
+            "Test",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            service.UpdateEventAsync(Guid.NewGuid(), eventItem));
     }
 
     [Fact]
-    public void DeleteEvent_NotFound()
+    public async Task DeleteEventAsync_NotFound()
     {
-        Assert.Throws<NotFoundException>(() => _service.DeleteEvent(Guid.NewGuid()));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            service.DeleteEventAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void AddEvent_InvalidDates()
+    public async Task CreateEventAsync_InvalidDates()
     {
-        var eventItem = CreateEvent("Bad", new DateTime(2026, 7, 10, 12, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        Assert.Throws<ArgumentException>(() => _service.AddEvent(eventItem));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateEventAsync(CreateRequest(
+            "Bad",
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            new DateTime(2026, 7, 10, 10, 0, 0))));
     }
 
     [Fact]
-    public void UpdateEvent_InvalidDates()
+    public async Task UpdateEventAsync_InvalidDates()
     {
-        var eventItem = CreateEvent("Test", new DateTime(2026, 7, 10, 10, 0, 0), new DateTime(2026, 7, 10, 12, 0, 0));
-        _service.AddEvent(eventItem);
-        var invalid = CreateEvent("Bad", new DateTime(2026, 7, 10, 12, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
 
-        Assert.Throws<ArgumentException>(() => _service.UpdateEvent(eventItem.Id, invalid));
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Test",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0)));
+
+        var invalid = Event.FromUpdate(CreateRequest(
+            "Bad",
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            new DateTime(2026, 7, 10, 10, 0, 0)));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.UpdateEventAsync(created.Id, invalid));
     }
 }
