@@ -1,14 +1,19 @@
 # WebApp
 
-API для работы с событиями и бронированиями. Всё хранится в памяти, после перезапуска данные пропадают.
+API для работы с событиями и бронированиями. Данные хранятся в PostgreSQL через Entity Framework Core.
 
 Ссылка на репозиторий: https://github.com/casperxxx/WebApp  
-Рабочая ветка: sprint-4
+Рабочая ветка: sprint-5
 
 ## Как запустить
 
 1. Склонировать репозиторий
-2. Зайти в папку WebApp
+2. Запустить PostgreSQL в Docker (из корня репозитория):
+
+```
+docker compose up -d
+```
+
 3. Выполнить команды:
 
 ```
@@ -21,11 +26,23 @@ dotnet run --project WebApp/WebApp.csproj
 
 Swagger: http://localhost:5176/swagger
 
+При первом запуске EF Core автоматически создаёт таблицы `events` и `bookings` в базе (`EnsureCreated`).
+
+Строка подключения в `WebApp/appsettings.json`:
+
+```
+Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
+```
+
+Порт **5433** на хосте — чтобы не конфликтовать с локальным PostgreSQL на 5432.
+
 ## Как запустить тесты
 
 ```
 dotnet test
 ```
+
+В тестах используется InMemory-провайдер EF Core вместо PostgreSQL. Интеграционные тесты (`ErrorResponseTests`) подменяют `AppDbContext` через `CustomWebApplicationFactory` и отключают фоновый сервис.
 
 ## Методы API
 
@@ -137,12 +154,22 @@ GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
 
 Поэтому сразу после создания GET вернёт Pending, а через несколько секунд — уже Confirmed (или Rejected).
 
+Фоновый сервис — синглтон, а DbContext — scoped. Для работы с БД используется `IServiceScopeFactory`: отдельный scope на каждую бронь.
+
 ## Синхронизация
 
-Чтобы при одновременных запросах не было овербукинга, используются примитивы синхронизации:
+Чтобы при одновременных запросах не было овербукинга, в `BookingService` используется **static SemaphoreSlim** — защищает критическую секцию «проверка мест + создание брони» при async-операциях с БД. Обычный `lock` здесь нельзя, потому что внутри есть `await`.
 
-- **lock** в BookingService.CreateBookingAsync — защищает критическую секцию «проверка мест + создание брони». В один момент только один поток может занять место.
-- **SemaphoreSlim** в BookingBackgroundService — асинхронный аналог lock. Нужен, потому что внутри фоновой обработки есть await, а обычный lock с await использовать нельзя. Задержки Task.Delay идут параллельно, а запись в хранилище — по очереди.
+В фоновом сервисе отдельный `SemaphoreSlim` не нужен: каждая задача работает со своим экземпляром `DbContext` в своём scope.
+
+## Пример сценария (персистентность)
+
+1. Запустить `docker compose up -d` и приложение
+2. Создать событие через POST /events
+3. Создать бронь через POST /events/{id}/book
+4. Проверить GET /bookings/{id} — статус Pending
+5. Остановить и снова запустить приложение
+6. GET /events и GET /bookings/{id} — данные на месте (хранятся в PostgreSQL)
 
 ## Пример сценария (овербукинг)
 

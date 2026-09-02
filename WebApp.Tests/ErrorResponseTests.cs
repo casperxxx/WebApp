@@ -2,15 +2,22 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using WebApp.DataAccess;
+using WebApp.Services;
 
 namespace WebApp.Tests;
 
-public class ErrorResponseTests : IClassFixture<WebApplicationFactory<Program>>
+public class ErrorResponseTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
-    public ErrorResponseTests(WebApplicationFactory<Program> factory)
+    public ErrorResponseTests(CustomWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
@@ -98,5 +105,39 @@ public class ErrorResponseTests : IClassFixture<WebApplicationFactory<Program>>
         var body = await secondBook.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(409, body.GetProperty("status").GetInt32());
         Assert.True(body.TryGetProperty("traceId", out _));
+    }
+}
+
+public class CustomWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<AppDbContext>();
+
+            var optionConfigurations = services
+                .Where(d => d.ServiceType.IsGenericType
+                    && d.ServiceType.GetGenericTypeDefinition() == typeof(IDbContextOptionsConfiguration<>))
+                .ToList();
+
+            foreach (var descriptor in optionConfigurations)
+            {
+                services.Remove(descriptor);
+            }
+
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseInMemoryDatabase("ErrorResponseTests"));
+
+            var backgroundServices = services
+                .Where(d => d.ImplementationType == typeof(BookingBackgroundService))
+                .ToList();
+
+            foreach (var descriptor in backgroundServices)
+            {
+                services.Remove(descriptor);
+            }
+        });
     }
 }
