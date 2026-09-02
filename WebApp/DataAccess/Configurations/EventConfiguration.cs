@@ -27,6 +27,7 @@ internal sealed class EventConfiguration : IEntityTypeConfiguration<Event>
 
         builder.HasMany(e => e.Bookings)
             .WithOne(b => b.Event)
-            .HasForeignKey(b => b.EventId);
+            .HasForeignKey(b => b.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
