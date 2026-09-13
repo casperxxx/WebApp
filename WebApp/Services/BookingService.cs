@@ -1,7 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
+using WebApp.Repositories;
 
 namespace WebApp.Services;
 
@@ -12,11 +11,14 @@ internal class BookingService : IBookingService
 {
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    private readonly AppDbContext _context;
+    // сервисы больше не ходят в AppDbContext напрямую
+    private readonly IEventRepository _eventRepository;
+    private readonly IBookingRepository _bookingRepository;
 
-    public BookingService(AppDbContext context)
+    public BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository)
     {
-        _context = context;
+        _eventRepository = eventRepository;
+        _bookingRepository = bookingRepository;
     }
 
     /// <summary>
@@ -27,7 +29,7 @@ internal class BookingService : IBookingService
         await BookingLock.WaitAsync();
         try
         {
-            var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+            var eventItem = await _eventRepository.GetByIdAsync(eventId);
             if (eventItem is null)
             {
                 throw new NotFoundException($"Событие с id {eventId} не найдено");
@@ -39,8 +41,8 @@ internal class BookingService : IBookingService
             }
 
             var booking = Booking.CreatePending(eventId);
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
+            // AddAsync сохранит и бронь, и уменьшенные AvailableSeats
+            await _bookingRepository.AddAsync(booking);
 
             return booking;
         }
@@ -55,7 +57,7 @@ internal class BookingService : IBookingService
     /// </summary>
     public async Task<Booking> GetBookingByIdAsync(Guid bookingId)
     {
-        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+        var booking = await _bookingRepository.GetByIdAsync(bookingId);
         if (booking is null)
         {
             throw new NotFoundException($"Бронь с id {bookingId} не найдена");
