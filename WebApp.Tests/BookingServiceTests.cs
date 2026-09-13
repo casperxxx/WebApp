@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
+using WebApp.Repositories;
 using WebApp.Services;
 
 namespace WebApp.Tests;
@@ -17,6 +18,9 @@ public class BookingServiceTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_dbName));
+        // регистрируем репозитории, сервисы больше не зависят от AppDbContext напрямую
+        services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         _serviceProvider = services.BuildServiceProvider();
