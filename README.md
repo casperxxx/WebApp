@@ -1,9 +1,9 @@
 # WebApp
 
-API для работы с событиями и бронированиями. Данные хранятся в PostgreSQL через Entity Framework Core.
+API для работы с событиями и бронированиями. Данные хранятся в PostgreSQL через Entity Framework Core. Схема БД управляется **миграциями** (`Migrate()`), а не `EnsureCreated()`.
 
 Ссылка на репозиторий: https://github.com/casperxxx/WebApp  
-Рабочая ветка: sprint-5
+Рабочая ветка: sprint-6
 
 ## Как запустить
 
@@ -26,7 +26,7 @@ dotnet run --project WebApp/WebApp.csproj
 
 Swagger: http://localhost:5176/swagger
 
-При первом запуске EF Core автоматически создаёт таблицы `events` и `bookings` в базе (`EnsureCreated`).
+При старте приложение применяет миграции (`db.Database.Migrate()`): создаются таблицы `events` и `bookings`, если их ещё нет.
 
 Строка подключения в `WebApp/appsettings.json`:
 
@@ -36,13 +36,41 @@ Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
 
 Порт **5433** на хосте — чтобы не конфликтовать с локальным PostgreSQL на 5432.
 
+## Миграции EF Core
+
+Пакет `Microsoft.EntityFrameworkCore.Design` нужен для команд `dotnet ef`.
+
+Создать новую миграцию:
+
+```
+dotnet ef migrations add ИмяМиграции --project WebApp/WebApp.csproj --output-dir DataAccess/Migrations
+```
+
+Применить миграции можно:
+- автоматически при запуске приложения (`Migrate()` в `Program.cs`);
+- или вручную:
+
+```
+dotnet ef database update --project WebApp/WebApp.csproj
+```
+
+Начальная миграция: `InitialCreate` (таблицы `events`, `bookings` и внешний ключ).
+
 ## Как запустить тесты
 
 ```
 dotnet test
 ```
 
-В тестах используется InMemory-провайдер EF Core вместо PostgreSQL. Интеграционные тесты (`ErrorResponseTests`) подменяют `AppDbContext` через `CustomWebApplicationFactory` и отключают фоновый сервис.
+Нужен **запущенный Docker** — интеграционные тесты поднимают PostgreSQL через Testcontainers.
+
+Что проверяется:
+- **WebApp.Tests** — юнит-тесты сервисов на InMemory EF Core; `ErrorResponseTests` подменяют БД через `CustomWebApplicationFactory`
+- **EventApi.IntegrationTests** — интеграционные тесты репозиториев на реальном PostgreSQL (Testcontainers): миграции, CRUD, фильтры, пагинация
+
+## Репозитории
+
+Доступ к данным идёт через `IEventRepository` / `IBookingRepository`. Сервисы и фоновый сервис не обращаются к `AppDbContext` напрямую.
 
 ## Методы API
 
@@ -80,27 +108,6 @@ dotnet test
 GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
 ```
 
-Ответ:
-
-```json
-{
-  "totalCount": 1,
-  "items": [
-    {
-      "id": "00000000-0000-0000-0000-000000000001",
-      "title": "Встреча",
-      "description": null,
-      "startAt": "2026-07-10T10:00:00",
-      "endAt": "2026-07-10T12:00:00",
-      "totalSeats": 3,
-      "availableSeats": 3
-    }
-  ],
-  "page": 1,
-  "pageSize": 5
-}
-```
-
 ## Бронирования
 
 Модель Booking:
@@ -127,18 +134,6 @@ GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
 - 404 — события с таким id нет
 - 409 — свободных мест нет (Conflict)
 
-Пример ответа:
-
-```json
-{
-  "id": "11111111-1111-1111-1111-111111111111",
-  "eventId": "00000000-0000-0000-0000-000000000001",
-  "status": "Pending",
-  "createdAt": "2026-08-09T10:00:00Z",
-  "processedAt": null
-}
-```
-
 ### GET /bookings/{id}
 
 Возвращает текущее состояние брони. Если брони нет — 404.
@@ -154,46 +149,23 @@ GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
 
 Поэтому сразу после создания GET вернёт Pending, а через несколько секунд — уже Confirmed (или Rejected).
 
-Фоновый сервис — синглтон, а DbContext — scoped. Для работы с БД используется `IServiceScopeFactory`: отдельный scope на каждую бронь.
+Фоновый сервис — синглтон. Репозитории (и DbContext) — scoped, поэтому используется `IServiceScopeFactory`.
 
 ## Синхронизация
 
-Чтобы при одновременных запросах не было овербукинга, в `BookingService` используется **static SemaphoreSlim** — защищает критическую секцию «проверка мест + создание брони» при async-операциях с БД. Обычный `lock` здесь нельзя, потому что внутри есть `await`.
+В `BookingService` используется **static SemaphoreSlim** — критическая секция «проверка мест + создание брони». Обычный `lock` нельзя, потому что внутри есть `await`.
 
-В фоновом сервисе отдельный `SemaphoreSlim` не нужен: каждая задача работает со своим экземпляром `DbContext` в своём scope.
-
-## Пример сценария (персистентность)
+## Пример сценария (проверка через Swagger)
 
 1. Запустить `docker compose up -d` и приложение
-2. Создать событие через POST /events
-3. Создать бронь через POST /events/{id}/book
-4. Проверить GET /bookings/{id} — статус Pending
-5. Остановить и снова запустить приложение
-6. GET /events и GET /bookings/{id} — данные на месте (хранятся в PostgreSQL)
-
-## Пример сценария (овербукинг)
-
-1. Создать событие через POST /events с `"totalSeats": 3`
-2. Три раза вызвать POST /events/{id}/book — все должны вернуть 202 Accepted
-3. Четвёртый POST /events/{id}/book — должен вернуть 409 Conflict
-4. Подождать несколько секунд и проверить GET /bookings/{id} — статус Confirmed, processedAt заполнен
+2. POST /events — создать событие
+3. POST /events/{id}/book — создать бронь
+4. GET /events/{id} и GET /bookings/{id} — проверить данные
+5. Перезапустить приложение — данные остаются в PostgreSQL
 
 ## Формат ошибки
 
-При ошибках API возвращает Problem Details (RFC 7807), Content-Type: `application/problem+json`:
-
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
-  "title": "Не найдено",
-  "status": 404,
-  "detail": "Событие с id ... не найдено",
-  "instance": "/events/...",
-  "traceId": "00-..."
-}
-```
-
-При ошибке валидации (400) в ответе также есть поле `errors`.
+При ошибках API возвращает Problem Details (RFC 7807), Content-Type: `application/problem+json`.
 
 Коды:
 - 400 — ошибка валидации / некорректные параметры (в том числе totalSeats <= 0)

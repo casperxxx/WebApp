@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
+using WebApp.Repositories;
 using WebApp.Services;
 
 namespace WebApp.Tests;
@@ -16,6 +17,8 @@ public class EventServiceTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_dbName));
+        // сервису нужен репозиторий
+        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventService, EventService>();
         _serviceProvider = services.BuildServiceProvider();
     }

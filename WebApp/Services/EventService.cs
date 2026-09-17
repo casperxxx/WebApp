@@ -1,7 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using WebApp.DataAccess;
 using WebApp.Exceptions;
 using WebApp.Models;
+using WebApp.Repositories;
 
 namespace WebApp.Services;
 
@@ -10,15 +9,15 @@ namespace WebApp.Services;
 /// </summary>
 internal class EventService : IEventService
 {
-    private readonly AppDbContext _context;
+    // вместо AppDbContext работаем через репозиторий
+    private readonly IEventRepository _eventRepository;
 
     /// <summary>
-    /// Создаёт сервис и получает контекст БД через DI
+    /// Создаёт сервис и получает репозиторий через DI
     /// </summary>
-    /// <param name="context">Контекст базы данных</param>
-    public EventService(AppDbContext context)
+    public EventService(IEventRepository eventRepository)
     {
-        _context = context;
+        _eventRepository = eventRepository;
     }
 
     /// <summary>
@@ -46,29 +45,9 @@ internal class EventService : IEventService
             throw new ArgumentException("pageSize должен быть <= 100");
         }
 
-        var query = _context.Events.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            var titleLower = title.ToLower();
-            query = query.Where(e => e.Title.ToLower().Contains(titleLower));
-        }
-
-        if (from.HasValue)
-        {
-            query = query.Where(e => e.StartAt >= from.Value);
-        }
-
-        if (to.HasValue)
-        {
-            query = query.Where(e => e.EndAt <= to.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+        var skip = (page - 1) * pageSize;
+        // данные берём из репозитория, валидацию page/pageSize оставляем в сервисе
+        var (items, totalCount) = await _eventRepository.GetEventsAsync(title, from, to, skip, pageSize);
 
         return new PaginatedResultDTO<Event>
         {
@@ -84,7 +63,7 @@ internal class EventService : IEventService
     /// </summary>
     public async Task<Event> GetEventAsync(Guid id)
     {
-        var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        var eventItem = await _eventRepository.GetByIdAsync(id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
@@ -107,8 +86,7 @@ internal class EventService : IEventService
             totalSeats);
 
         ValidateDates(eventItem);
-        _context.Events.Add(eventItem);
-        await _context.SaveChangesAsync();
+        await _eventRepository.AddAsync(eventItem);
 
         return eventItem;
     }
@@ -118,7 +96,7 @@ internal class EventService : IEventService
     /// </summary>
     public async Task<Event> UpdateEventAsync(Guid id, Event eventItem)
     {
-        var existing = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        var existing = await _eventRepository.GetByIdAsync(id);
         if (existing is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
@@ -137,7 +115,7 @@ internal class EventService : IEventService
         // не затираем уже занятые места
         existing.AvailableSeats = Math.Max(0, totalSeats - reservedSeats);
 
-        await _context.SaveChangesAsync();
+        await _eventRepository.UpdateAsync(existing);
 
         return existing;
     }
@@ -147,14 +125,13 @@ internal class EventService : IEventService
     /// </summary>
     public async Task DeleteEventAsync(Guid id)
     {
-        var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        var eventItem = await _eventRepository.GetByIdAsync(id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        _context.Events.Remove(eventItem);
-        await _context.SaveChangesAsync();
+        await _eventRepository.DeleteAsync(eventItem);
     }
 
     private static void ValidateDates(Event eventItem)

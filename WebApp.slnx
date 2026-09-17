@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="WebApp/WebApp.csproj" />
   <Project Path="WebApp.Tests/WebApp.Tests.csproj" />
+  <Project Path="EventApi.IntegrationTests/EventApi.IntegrationTests.csproj" />
 </Solution>
