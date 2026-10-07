@@ -23,4 +23,9 @@
     <InternalsVisibleTo Include="EventApi.IntegrationTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\WebApp.Application\WebApp.Application.csproj" />
+    <ProjectReference Include="..\WebApp.Infrastructure\WebApp.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
