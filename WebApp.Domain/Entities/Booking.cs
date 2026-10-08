@@ -1,6 +1,4 @@
-using System.Text.Json.Serialization;
-
-namespace WebApp.Models;
+namespace WebApp.Domain.Entities;
 
 /// <summary>
 /// Модель бронирования
@@ -24,7 +22,6 @@ public class Booking
     /// <summary>
     /// Событие, к которому относится бронь
     /// </summary>
-    [JsonIgnore]
     public Event? Event { get; set; }
 
     /// <summary>

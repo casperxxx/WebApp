@@ -1,7 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
-
-namespace WebApp.Models;
+namespace WebApp.Domain.Entities;
 
 /// <summary>
 /// Модель события
@@ -52,21 +49,25 @@ public class Event
     /// <summary>
     /// Брони на это событие
     /// </summary>
-    [JsonIgnore]
     public ICollection<Booking> Bookings { get; private set; }
 
     /// <summary>
-    /// Данные для обновления события из DTO
+    /// Данные для обновления события (без Id и AvailableSeats)
     /// </summary>
-    public static Event FromUpdate(EventDTO request)
+    public static Event FromUpdate(
+        string title,
+        string? description,
+        DateTime startAt,
+        DateTime endAt,
+        int totalSeats)
     {
         return new Event
         {
-            Title = request.Title,
-            Description = request.Description,
-            StartAt = request.StartAt,
-            EndAt = request.EndAt,
-            TotalSeats = request.TotalSeats ?? 0
+            Title = title,
+            Description = description,
+            StartAt = startAt,
+            EndAt = endAt,
+            TotalSeats = totalSeats
         };
     }
 
@@ -82,7 +83,7 @@ public class Event
     {
         if (totalSeats <= 0)
         {
-            throw new ValidationException("TotalSeats должно быть больше нуля");
+            throw new ArgumentException("TotalSeats должно быть больше нуля");
         }
 
         return new Event

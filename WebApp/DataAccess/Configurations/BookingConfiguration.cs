@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using WebApp.Models;
+using WebApp.Domain.Entities;
 
 namespace WebApp.DataAccess.Configurations;
 

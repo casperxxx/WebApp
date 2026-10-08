@@ -1,4 +1,4 @@
-using WebApp.Models;
+using WebApp.Domain.Entities;
 
 namespace WebApp.Services;
 

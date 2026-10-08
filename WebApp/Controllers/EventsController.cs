@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using WebApp.Domain.Entities;
 using WebApp.Models;
 using WebApp.Services;
 
@@ -85,7 +86,12 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(Guid id, EventDTO request)
     {
-        var eventItem = Event.FromUpdate(request);
+        var eventItem = Event.FromUpdate(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats ?? 0);
 
         var updated = await _eventService.UpdateEventAsync(id, eventItem);
 
