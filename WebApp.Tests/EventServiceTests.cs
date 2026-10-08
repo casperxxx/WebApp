@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WebApp.DataAccess;
-using WebApp.Exceptions;
+using WebApp.Domain.Entities;
+using WebApp.Domain.Exceptions;
 using WebApp.Models;
 using WebApp.Repositories;
 using WebApp.Services;
@@ -123,10 +124,12 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var updated = Event.FromUpdate(CreateRequest(
+        var updated = Event.FromUpdate(
             "New",
+            null,
             new DateTime(2026, 7, 10, 11, 0, 0),
-            new DateTime(2026, 7, 10, 13, 0, 0)));
+            new DateTime(2026, 7, 10, 13, 0, 0),
+            10);
 
         await service.UpdateEventAsync(created.Id, updated);
 
@@ -304,10 +307,12 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        var eventItem = Event.FromUpdate(CreateRequest(
+        var eventItem = Event.FromUpdate(
             "Test",
+            null,
             new DateTime(2026, 7, 10, 10, 0, 0),
-            new DateTime(2026, 7, 10, 12, 0, 0)));
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            10);
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             service.UpdateEventAsync(Guid.NewGuid(), eventItem));
@@ -346,10 +351,12 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var invalid = Event.FromUpdate(CreateRequest(
+        var invalid = Event.FromUpdate(
             "Bad",
+            null,
             new DateTime(2026, 7, 10, 12, 0, 0),
-            new DateTime(2026, 7, 10, 10, 0, 0)));
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            10);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.UpdateEventAsync(created.Id, invalid));

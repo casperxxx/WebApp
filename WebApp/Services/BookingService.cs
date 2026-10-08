@@ -1,5 +1,5 @@
-using WebApp.Exceptions;
-using WebApp.Models;
+using WebApp.Domain.Entities;
+using WebApp.Domain.Exceptions;
 using WebApp.Repositories;
 
 namespace WebApp.Services;

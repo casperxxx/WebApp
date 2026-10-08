@@ -1,4 +1,4 @@
-namespace WebApp.Exceptions;
+namespace WebApp.Domain.Exceptions;
 
 /// <summary>
 /// Исключение когда на событии нет свободных мест
