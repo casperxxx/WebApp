@@ -1,4 +1,4 @@
-namespace WebApp.Models;
+namespace WebApp.Application.Models;
 
 /// <summary>
 /// Результат с пагинацией

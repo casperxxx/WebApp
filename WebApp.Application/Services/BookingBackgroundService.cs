@@ -1,7 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using WebApp.Application.Repositories;
 using WebApp.Domain.Entities;
-using WebApp.Repositories;
 
-namespace WebApp.Services;
+namespace WebApp.Application.Services;
 
 /// <summary>
 /// Фоновая обработка броней: Pending -> Confirmed / Rejected

@@ -1,8 +1,8 @@
+using WebApp.Application.Repositories;
 using WebApp.Domain.Entities;
 using WebApp.Domain.Exceptions;
-using WebApp.Repositories;
 
-namespace WebApp.Services;
+namespace WebApp.Application.Services;
 
 /// <summary>
 /// Сервис для работы с бронированиями

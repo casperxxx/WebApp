@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace WebApp.Models;
+namespace WebApp.Application.Models;
 
 /// <summary>
 /// DTO модели событий

@@ -1,11 +1,11 @@
 using WebApp.Domain.Entities;
 
-namespace WebApp.Repositories;
+namespace WebApp.Application.Repositories;
 
 /// <summary>
 /// Репозиторий для работы с событиями в БД
 /// </summary>
-internal interface IEventRepository
+public interface IEventRepository
 {
     /// <summary>
     /// Список событий с фильтрами и пагинацией
