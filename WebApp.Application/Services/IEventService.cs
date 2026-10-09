@@ -1,7 +1,7 @@
-﻿using WebApp.Domain.Entities;
-using WebApp.Models;
+using WebApp.Application.Models;
+using WebApp.Domain.Entities;
 
-namespace WebApp.Services;
+namespace WebApp.Application.Services;
 
 /// <summary>
 /// Интерфейс сервиса

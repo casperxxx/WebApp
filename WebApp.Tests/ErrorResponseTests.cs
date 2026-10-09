@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WebApp.DataAccess;
-using WebApp.Services;
+using WebApp.Application.Services;
 
 namespace WebApp.Tests;
 

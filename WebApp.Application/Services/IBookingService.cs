@@ -1,6 +1,6 @@
 using WebApp.Domain.Entities;
 
-namespace WebApp.Services;
+namespace WebApp.Application.Services;
 
 /// <summary>
 /// Сервис для работы с бронированиями

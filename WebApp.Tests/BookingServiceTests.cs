@@ -3,8 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using WebApp.DataAccess;
 using WebApp.Domain.Entities;
 using WebApp.Domain.Exceptions;
+using WebApp.Application.Repositories;
+using WebApp.Application.Services;
 using WebApp.Repositories;
-using WebApp.Services;
 
 namespace WebApp.Tests;
 

@@ -2,10 +2,11 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WebApp.Application;
+using WebApp.Application.Repositories;
 using WebApp.DataAccess;
 using WebApp.Middleware;
 using WebApp.Repositories;
-using WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,12 +57,11 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// репозитории — Scoped, как и DbContext
+builder.Services.AddApplication();
+
+// репозитории — Scoped, как и DbContext (переезд в Infrastructure на этапе 5)
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddHostedService<BookingBackgroundService>();
 
 var app = builder.Build();
 

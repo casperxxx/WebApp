@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Domain.Entities;
-using WebApp.Services;
+using WebApp.Application.Services;
 
 namespace WebApp.Controllers;
 

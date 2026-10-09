@@ -1,11 +1,11 @@
 using WebApp.Domain.Entities;
 
-namespace WebApp.Repositories;
+namespace WebApp.Application.Repositories;
 
 /// <summary>
 /// Репозиторий для работы с бронированиями в БД
 /// </summary>
-internal interface IBookingRepository
+public interface IBookingRepository
 {
     /// <summary>
     /// Найти бронь по Id
