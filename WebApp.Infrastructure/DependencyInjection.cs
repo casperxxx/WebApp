@@ -27,4 +27,18 @@ public static class DependencyInjection
 
         return services;
     }
+
+    /// <summary>
+    /// Применяет миграции для реляционной БД (InMemory в тестах пропускается)
+    /// </summary>
+    public static void ApplyMigrations(this IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (db.Database.IsRelational())
+        {
+            db.Database.Migrate();
+        }
+    }
 }

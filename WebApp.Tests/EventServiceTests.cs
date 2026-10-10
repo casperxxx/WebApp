@@ -125,12 +125,10 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var updated = Event.FromUpdate(
+        var updated = CreateRequest(
             "New",
-            null,
             new DateTime(2026, 7, 10, 11, 0, 0),
-            new DateTime(2026, 7, 10, 13, 0, 0),
-            10);
+            new DateTime(2026, 7, 10, 13, 0, 0));
 
         await service.UpdateEventAsync(created.Id, updated);
 
@@ -308,12 +306,10 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        var eventItem = Event.FromUpdate(
+        var eventItem = CreateRequest(
             "Test",
-            null,
             new DateTime(2026, 7, 10, 10, 0, 0),
-            new DateTime(2026, 7, 10, 12, 0, 0),
-            10);
+            new DateTime(2026, 7, 10, 12, 0, 0));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             service.UpdateEventAsync(Guid.NewGuid(), eventItem));
@@ -352,12 +348,10 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var invalid = Event.FromUpdate(
+        var invalid = CreateRequest(
             "Bad",
-            null,
             new DateTime(2026, 7, 10, 12, 0, 0),
-            new DateTime(2026, 7, 10, 10, 0, 0),
-            10);
+            new DateTime(2026, 7, 10, 10, 0, 0));
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.UpdateEventAsync(created.Id, invalid));

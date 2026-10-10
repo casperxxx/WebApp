@@ -5,6 +5,9 @@ using WebApp.Domain.Entities;
 
 namespace WebApp.Controllers;
 
+/// <summary>
+/// HTTP-эндпоинты для событий и создания броней
+/// </summary>
 [ApiController]
 [Route("events")]
 public class EventsController : ControllerBase
@@ -12,6 +15,9 @@ public class EventsController : ControllerBase
     private readonly IEventService _eventService;
     private readonly IBookingService _bookingService;
 
+    /// <summary>
+    /// Создаёт контроллер событий
+    /// </summary>
     public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
@@ -86,15 +92,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(Guid id, EventDTO request)
     {
-        var eventItem = Event.FromUpdate(
-            request.Title,
-            request.Description,
-            request.StartAt,
-            request.EndAt,
-            request.TotalSeats ?? 0);
-
-        var updated = await _eventService.UpdateEventAsync(id, eventItem);
-
+        var updated = await _eventService.UpdateEventAsync(id, request);
         return Ok(updated);
     }
 

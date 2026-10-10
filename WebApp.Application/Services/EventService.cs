@@ -95,13 +95,20 @@ internal class EventService : IEventService
     /// <summary>
     /// Обновляет данные события по Id
     /// </summary>
-    public async Task<Event> UpdateEventAsync(Guid id, Event eventItem)
+    public async Task<Event> UpdateEventAsync(Guid id, EventDTO request)
     {
         var existing = await _eventRepository.GetByIdAsync(id);
         if (existing is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
+
+        var eventItem = Event.FromUpdate(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats ?? 0);
 
         ValidateDates(eventItem);
 

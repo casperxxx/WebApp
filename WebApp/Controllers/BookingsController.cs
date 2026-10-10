@@ -13,6 +13,9 @@ public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;
 
+    /// <summary>
+    /// Создаёт контроллер бронирований
+    /// </summary>
     public BookingsController(IBookingService bookingService)
     {
         _bookingService = bookingService;
