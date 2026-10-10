@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace WebApp.DataAccess.Migrations
+namespace WebApp.Infrastructure.DataAccess.Migrations
 {
     /// <inheritdoc />
     // начальная миграция: таблицы events, bookings и внешний ключ
@@ -67,3 +67,4 @@ namespace WebApp.DataAccess.Migrations
         }
     }
 }
+
