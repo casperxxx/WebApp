@@ -1,10 +1,8 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Application;
 using WebApp.Infrastructure;
-using WebApp.Infrastructure.DataAccess;
 using WebApp.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,7 +43,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Events API",
         Version = "v1",
-        Description = "Спринт-6. API для управления событиями и бронями"
+        Description = "Спринт-7. Clean Architecture: Domain / Application / Infrastructure / Presentation"
     });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -53,20 +51,15 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
+// composition root: слои Application и Infrastructure
 builder.Services.AddApplication();
+// репозитории и DbContext — Scoped, регистрируются в AddInfrastructure
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // схема БД через миграции (InMemory в тестах — без Migrate)
-    if (db.Database.IsRelational())
-    {
-        db.Database.Migrate();
-    }
-}
+// схема БД через миграции (InMemory в тестах — без Migrate)
+app.Services.ApplyMigrations();
 
 if (app.Environment.IsDevelopment())
 {

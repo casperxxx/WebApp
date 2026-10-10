@@ -13,12 +13,18 @@ public class ExceptionHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
+    /// <summary>
+    /// Создаёт middleware обработки ошибок
+    /// </summary>
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
         _next = next;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Перехватывает исключения и отдаёт ProblemDetails
+    /// </summary>
     public async Task InvokeAsync(HttpContext context)
     {
         try

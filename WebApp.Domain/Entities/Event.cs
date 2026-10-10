@@ -52,7 +52,7 @@ public class Event
     public ICollection<Booking> Bookings { get; private set; }
 
     /// <summary>
-    /// Данные для обновления события (без Id и AvailableSeats)
+    /// Данные для обновления события из DTO
     /// </summary>
     public static Event FromUpdate(
         string title,

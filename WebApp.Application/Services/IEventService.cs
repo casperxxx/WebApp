@@ -42,9 +42,9 @@ public interface IEventService
     /// Изменить событие по id
     /// </summary>
     /// <param name="id">Id события</param>
-    /// <param name="eventItem">Новые данные события</param>
+    /// <param name="request">Новые данные события</param>
     /// <returns>Обновлённое событие</returns>
-    Task<Event> UpdateEventAsync(Guid id, Event eventItem);
+    Task<Event> UpdateEventAsync(Guid id, EventDTO request);
 
     /// <summary>
     /// Удалить событие по id
