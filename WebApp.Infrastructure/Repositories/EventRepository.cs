@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using WebApp.Application.Repositories;
-using WebApp.DataAccess;
 using WebApp.Domain.Entities;
+using WebApp.Infrastructure.DataAccess;
 
-namespace WebApp.Repositories;
+namespace WebApp.Infrastructure.Repositories;
 
 /// <summary>
 /// Реализация репозитория событий через AppDbContext

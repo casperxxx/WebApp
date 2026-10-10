@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using WebApp.DataAccess;
+using WebApp.Infrastructure.DataAccess;
 
 #nullable disable
 
-namespace WebApp.DataAccess.Migrations
+namespace WebApp.Infrastructure.DataAccess.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -98,3 +98,4 @@ namespace WebApp.DataAccess.Migrations
         }
     }
 }
+

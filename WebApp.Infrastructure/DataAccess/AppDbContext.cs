@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using WebApp.Domain.Entities;
 
-namespace WebApp.DataAccess;
+namespace WebApp.Infrastructure.DataAccess;
 
-internal sealed class AppDbContext : DbContext
+public sealed class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {

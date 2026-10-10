@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
-using WebApp.DataAccess;
 using WebApp.Application.Repositories;
-using WebApp.Repositories;
+using WebApp.Infrastructure.DataAccess;
+using WebApp.Infrastructure.Repositories;
 
 namespace EventApi.IntegrationTests;
 

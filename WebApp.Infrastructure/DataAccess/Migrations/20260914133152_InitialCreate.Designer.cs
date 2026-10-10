@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using WebApp.DataAccess;
+using WebApp.Infrastructure.DataAccess;
 
 #nullable disable
 
-namespace WebApp.DataAccess.Migrations
+namespace WebApp.Infrastructure.DataAccess.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20260914133152_InitialCreate")]
@@ -101,3 +101,4 @@ namespace WebApp.DataAccess.Migrations
         }
     }
 }
+

@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WebApp.Domain.Entities;
 
-namespace WebApp.DataAccess.Configurations;
+namespace WebApp.Infrastructure.DataAccess.Configurations;
 
 internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 {
