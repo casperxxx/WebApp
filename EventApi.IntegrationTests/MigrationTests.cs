@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using WebApp.Domain.Entities;
 
 namespace EventApi.IntegrationTests;
 
