@@ -3,7 +3,21 @@
 API для работы с событиями и бронированиями. Данные хранятся в PostgreSQL через Entity Framework Core. Схема БД управляется **миграциями** (`Migrate()`), а не `EnsureCreated()`.
 
 Ссылка на репозиторий: https://github.com/casperxxx/WebApp  
-Рабочая ветка: sprint-6
+Рабочая ветка: sprint-7
+
+## Структура решения (Clean Architecture)
+
+Солюшен разделён на четыре проекта. Зависимости направлены только «внутрь»:
+
+| Слой | Проект | Назначение |
+|---|---|---|
+| Domain | `WebApp.Domain` | Сущности (`Event`, `Booking`, `BookingStatus`), доменные исключения. Без ссылок на фреймворки |
+| Application | `WebApp.Application` | Use cases (сервисы), порты (`IEventRepository`, `IBookingRepository`), DTO, фоновая логика бронирований. Зависит только от Domain |
+| Infrastructure | `WebApp.Infrastructure` | `AppDbContext`, Fluent-конфигурации, миграции, реализации репозиториев, EF/Npgsql. Зависит от Application и Domain |
+| Presentation | `WebApp` | Контроллеры, middleware ошибок, Swagger, composition root (`Program.cs`) |
+
+В `Program.cs` регистрация идёт через `AddApplication()` и `AddInfrastructure()`.  
+У **Application нет ссылки на Infrastructure** — только через интерфейсы портов.
 
 ## Как запустить
 
@@ -26,7 +40,7 @@ dotnet run --project WebApp/WebApp.csproj
 
 Swagger: http://localhost:5176/swagger
 
-При старте приложение применяет миграции (`db.Database.Migrate()`): создаются таблицы `events` и `bookings`, если их ещё нет.
+При старте приложение применяет миграции (`ApplyMigrations()` → `db.Database.Migrate()`): создаются таблицы `events` и `bookings`, если их ещё нет.
 
 Строка подключения в `WebApp/appsettings.json`:
 
@@ -38,20 +52,21 @@ Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
 
 ## Миграции EF Core
 
-Пакет `Microsoft.EntityFrameworkCore.Design` нужен для команд `dotnet ef`.
+Пакет `Microsoft.EntityFrameworkCore.Design` подключён в `WebApp.Infrastructure`.  
+Миграции лежат в `WebApp.Infrastructure/DataAccess/Migrations`.
 
 Создать новую миграцию:
 
 ```
-dotnet ef migrations add ИмяМиграции --project WebApp/WebApp.csproj --output-dir DataAccess/Migrations
+dotnet ef migrations add ИмяМиграции --project WebApp.Infrastructure --startup-project WebApp --output-dir DataAccess/Migrations
 ```
 
 Применить миграции можно:
-- автоматически при запуске приложения (`Migrate()` в `Program.cs`);
+- автоматически при запуске приложения (`ApplyMigrations()` в `Program.cs`);
 - или вручную:
 
 ```
-dotnet ef database update --project WebApp/WebApp.csproj
+dotnet ef database update --project WebApp.Infrastructure --startup-project WebApp
 ```
 
 Начальная миграция: `InitialCreate` (таблицы `events`, `bookings` и внешний ключ).
@@ -65,12 +80,13 @@ dotnet test
 Нужен **запущенный Docker** — интеграционные тесты поднимают PostgreSQL через Testcontainers.
 
 Что проверяется:
-- **WebApp.Tests** — юнит-тесты сервисов на InMemory EF Core; `ErrorResponseTests` подменяют БД через `CustomWebApplicationFactory`
-- **EventApi.IntegrationTests** — интеграционные тесты репозиториев на реальном PostgreSQL (Testcontainers): миграции, CRUD, фильтры, пагинация
+- **WebApp.Tests** — юнит-тесты сервисов на InMemory EF Core; `ErrorResponseTests` подменяют БД через `CustomWebApplicationFactory` (ссылки на Domain / Application / Infrastructure / Presentation)
+- **EventApi.IntegrationTests** — интеграционные тесты репозиториев на реальном PostgreSQL (Testcontainers): миграции, CRUD, фильтры, пагинация (ссылки на Domain / Application / Infrastructure)
 
 ## Репозитории
 
-Доступ к данным идёт через `IEventRepository` / `IBookingRepository`. Сервисы и фоновый сервис не обращаются к `AppDbContext` напрямую.
+Порты (`IEventRepository` / `IBookingRepository`) объявлены в **Application**.  
+Реализации — в **Infrastructure**. Сервисы и фоновый сервис не обращаются к `AppDbContext` напрямую.
 
 ## Методы API
 
@@ -140,7 +156,7 @@ GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
 
 ## Фоновая обработка
 
-В фоне работает BookingBackgroundService:
+В фоне работает BookingBackgroundService (слой Application):
 1. берёт все брони со статусом Pending
 2. обрабатывает их параллельно через Task.WhenAll
 3. для каждой брони ждёт пару секунд (имитация внешней системы)
