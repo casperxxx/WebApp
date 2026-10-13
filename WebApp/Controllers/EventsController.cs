@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using WebApp.Models;
-using WebApp.Services;
+using WebApp.Application.Models;
+using WebApp.Application.Services;
 
 namespace WebApp.Controllers;
 
+/// <summary>
+/// HTTP-эндпоинты для событий и создания броней
+/// </summary>
 [ApiController]
 [Route("events")]
 public class EventsController : ControllerBase
@@ -11,6 +14,9 @@ public class EventsController : ControllerBase
     private readonly IEventService _eventService;
     private readonly IBookingService _bookingService;
 
+    /// <summary>
+    /// Создаёт контроллер событий
+    /// </summary>
     public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
@@ -28,8 +34,8 @@ public class EventsController : ControllerBase
     /// <response code="200">Список событий успешно получен</response>
     /// <response code="400">Ошибка получения списка</response>
     [HttpGet]
-    [ProducesResponseType(typeof(PaginatedResultDTO<Event>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<PaginatedResultDTO<Event>>> GetAll(
+    [ProducesResponseType(typeof(PaginatedResultDTO<EventResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaginatedResultDTO<EventResponse>>> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
@@ -47,7 +53,7 @@ public class EventsController : ControllerBase
     /// <response code="200">Событие успешно найдено</response>
     /// <response code="404">Событие не найдено</response>
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(EventResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetById(Guid id)
     {
@@ -62,7 +68,7 @@ public class EventsController : ControllerBase
     /// <response code="201">Событие успешно создано</response>
     /// <response code="400">Некорректные данные запроса</response>
     [HttpPost]
-    [ProducesResponseType(typeof(Event), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(EventResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> Create(EventDTO request)
     {
@@ -80,15 +86,12 @@ public class EventsController : ControllerBase
     /// <response code="400">Некорректные данные запроса</response>
     /// <response code="404">Событие не найдено</response>
     [HttpPut("{id}")]
-    [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(EventResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(Guid id, EventDTO request)
     {
-        var eventItem = Event.FromUpdate(request);
-
-        var updated = await _eventService.UpdateEventAsync(id, eventItem);
-
+        var updated = await _eventService.UpdateEventAsync(id, request);
         return Ok(updated);
     }
 
@@ -114,10 +117,10 @@ public class EventsController : ControllerBase
     /// <response code="202">Бронь создана, обработка ещё идёт</response>
     /// <response code="404">Событие не найдено</response>
     [HttpPost("{id}/book")]
-    [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<Booking>> Book(Guid id)
+    public async Task<ActionResult<BookingResponse>> Book(Guid id)
     {
         var booking = await _bookingService.CreateBookingAsync(id);
         return Accepted($"/bookings/{booking.Id}", booking);

@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using WebApp.DataAccess;
-using WebApp.Exceptions;
-using WebApp.Models;
-using WebApp.Repositories;
-using WebApp.Services;
+using WebApp.Application.Models;
+using WebApp.Application.Repositories;
+using WebApp.Application.Services;
+using WebApp.Domain.Exceptions;
+using WebApp.Infrastructure.DataAccess;
+using WebApp.Infrastructure.Repositories;
 
 namespace WebApp.Tests;
 
@@ -17,9 +18,12 @@ public class EventServiceTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_dbName));
-        // сервису нужен репозиторий
+        // сервису нужен репозиторий и UnitOfWork
         services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEventService, EventService>();
+        services.AddScoped<IBookingService, BookingService>();
         _serviceProvider = services.BuildServiceProvider();
     }
 
@@ -123,10 +127,10 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var updated = Event.FromUpdate(CreateRequest(
+        var updated = CreateRequest(
             "New",
             new DateTime(2026, 7, 10, 11, 0, 0),
-            new DateTime(2026, 7, 10, 13, 0, 0)));
+            new DateTime(2026, 7, 10, 13, 0, 0));
 
         await service.UpdateEventAsync(created.Id, updated);
 
@@ -275,7 +279,7 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<DomainValidationException>(() =>
             service.GetEventsAsync(null, null, null, 0, 10));
     }
 
@@ -285,7 +289,7 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<DomainValidationException>(() =>
             service.GetEventsAsync(null, null, null, 1, 0));
     }
 
@@ -304,10 +308,10 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        var eventItem = Event.FromUpdate(CreateRequest(
+        var eventItem = CreateRequest(
             "Test",
             new DateTime(2026, 7, 10, 10, 0, 0),
-            new DateTime(2026, 7, 10, 12, 0, 0)));
+            new DateTime(2026, 7, 10, 12, 0, 0));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             service.UpdateEventAsync(Guid.NewGuid(), eventItem));
@@ -329,7 +333,7 @@ public class EventServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var service = CreateService(scope);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateEventAsync(CreateRequest(
+        await Assert.ThrowsAsync<DomainValidationException>(() => service.CreateEventAsync(CreateRequest(
             "Bad",
             new DateTime(2026, 7, 10, 12, 0, 0),
             new DateTime(2026, 7, 10, 10, 0, 0))));
@@ -346,12 +350,38 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 10, 0, 0),
             new DateTime(2026, 7, 10, 12, 0, 0)));
 
-        var invalid = Event.FromUpdate(CreateRequest(
+        var invalid = CreateRequest(
             "Bad",
             new DateTime(2026, 7, 10, 12, 0, 0),
-            new DateTime(2026, 7, 10, 10, 0, 0)));
+            new DateTime(2026, 7, 10, 10, 0, 0));
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<DomainValidationException>(() =>
             service.UpdateEventAsync(created.Id, invalid));
+    }
+
+    [Fact]
+    public async Task UpdateEventAsync_TotalSeatsLessThanReserved_Throws()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var service = CreateService(scope);
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+        var created = await service.CreateEventAsync(CreateRequest(
+            "Test",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            totalSeats: 2));
+
+        await bookingService.CreateBookingAsync(created.Id);
+        await bookingService.CreateBookingAsync(created.Id);
+
+        var shrink = CreateRequest(
+            "Test",
+            new DateTime(2026, 7, 10, 10, 0, 0),
+            new DateTime(2026, 7, 10, 12, 0, 0),
+            totalSeats: 1);
+
+        await Assert.ThrowsAsync<DomainValidationException>(() =>
+            service.UpdateEventAsync(created.Id, shrink));
     }
 }

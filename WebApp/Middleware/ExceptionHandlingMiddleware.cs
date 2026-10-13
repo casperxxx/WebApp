@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
-using WebApp.Exceptions;
+using WebApp.Domain.Exceptions;
 
 namespace WebApp.Middleware;
 
@@ -13,12 +13,18 @@ public class ExceptionHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
+    /// <summary>
+    /// Создаёт middleware обработки ошибок
+    /// </summary>
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
         _next = next;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Перехватывает исключения и отдаёт ProblemDetails
+    /// </summary>
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -50,7 +56,7 @@ public class ExceptionHandlingMiddleware
             title = "Нет свободных мест";
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.10";
         }
-        else if (exception is ArgumentException or ValidationException)
+        else if (exception is DomainValidationException or ValidationException)
         {
             statusCode = (int)HttpStatusCode.BadRequest;
             title = "Некорректный запрос";

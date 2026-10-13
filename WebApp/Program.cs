@@ -1,11 +1,9 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApp.DataAccess;
+using WebApp.Application;
+using WebApp.Infrastructure;
 using WebApp.Middleware;
-using WebApp.Repositories;
-using WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,35 +41,31 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Events API",
         Version = "v1",
-        Description = "Спринт-6. API для управления событиями и бронями"
+        Description = "Спринт-7. Clean Architecture: Domain / Application / Infrastructure / Presentation"
     });
 
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
+    var presentationXml = Path.Combine(AppContext.BaseDirectory, "WebApp.xml");
+    if (File.Exists(presentationXml))
+    {
+        options.IncludeXmlComments(presentationXml);
+    }
+
+    var applicationXml = Path.Combine(AppContext.BaseDirectory, "WebApp.Application.xml");
+    if (File.Exists(applicationXml))
+    {
+        options.IncludeXmlComments(applicationXml);
+    }
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// репозитории — Scoped, как и DbContext
-builder.Services.AddScoped<IEventRepository, EventRepository>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddHostedService<BookingBackgroundService>();
+// composition root: слои Application и Infrastructure
+builder.Services.AddApplication();
+// репозитории и DbContext — Scoped, регистрируются в AddInfrastructure
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // схема БД через миграции (InMemory в тестах — без Migrate)
-    if (db.Database.IsRelational())
-    {
-        db.Database.Migrate();
-    }
-}
+// схема БД через миграции (InMemory в тестах — без Migrate)
+app.Services.ApplyMigrations();
 
 if (app.Environment.IsDevelopment())
 {
