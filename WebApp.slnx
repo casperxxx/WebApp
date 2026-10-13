@@ -1,4 +1,7 @@
-<Solution>
+﻿<Solution>
+  <Project Path="WebApp.Domain/WebApp.Domain.csproj" />
+  <Project Path="WebApp.Application/WebApp.Application.csproj" />
+  <Project Path="WebApp.Infrastructure/WebApp.Infrastructure.csproj" />
   <Project Path="WebApp/WebApp.csproj" />
   <Project Path="WebApp.Tests/WebApp.Tests.csproj" />
   <Project Path="EventApi.IntegrationTests/EventApi.IntegrationTests.csproj" />

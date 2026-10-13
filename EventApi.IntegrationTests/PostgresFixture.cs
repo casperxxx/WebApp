@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
-using WebApp.DataAccess;
-using WebApp.Repositories;
+using WebApp.Application.Repositories;
+using WebApp.Infrastructure.DataAccess;
+using WebApp.Infrastructure.Repositories;
 
 namespace EventApi.IntegrationTests;
 
@@ -47,10 +48,15 @@ public sealed class PostgresFixture : IAsyncLifetime
         return new AppDbContext(options);
     }
 
-    internal (IEventRepository Events, IBookingRepository Bookings, AppDbContext Context) CreateRepositories()
+    internal (IEventRepository Events, IBookingRepository Bookings, IUnitOfWork UnitOfWork, AppDbContext Context)
+        CreateRepositories()
     {
         var context = CreateDbContext();
-        return (new EventRepository(context), new BookingRepository(context), context);
+        return (
+            new EventRepository(context),
+            new BookingRepository(context),
+            new UnitOfWork(context),
+            context);
     }
 }
 

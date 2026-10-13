@@ -8,13 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
-    <!-- нужен для генерации миграций (dotnet ef) -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>
 
@@ -22,5 +15,20 @@
     <InternalsVisibleTo Include="WebApp.Tests" />
     <InternalsVisibleTo Include="EventApi.IntegrationTests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebApp.Domain\WebApp.Domain.csproj" />
+    <ProjectReference Include="..\WebApp.Application\WebApp.Application.csproj" />
+    <ProjectReference Include="..\WebApp.Infrastructure\WebApp.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- XML Application для описаний DTO в Swagger -->
+  <Target Name="CopyApplicationXml" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(MSBuildThisFileDirectory)..\WebApp.Application\bin\$(Configuration)\$(TargetFramework)\WebApp.Application.xml"
+      DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(MSBuildThisFileDirectory)..\WebApp.Application\bin\$(Configuration)\$(TargetFramework)\WebApp.Application.xml')" />
+  </Target>
 
 </Project>

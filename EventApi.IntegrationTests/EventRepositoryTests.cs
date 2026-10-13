@@ -1,4 +1,4 @@
-using WebApp.Models;
+using WebApp.Domain.Entities;
 
 namespace EventApi.IntegrationTests;
 
@@ -21,18 +21,16 @@ public class EventRepositoryTests
     [Fact]
     public async Task AddAsync_And_GetByIdAsync_ReturnsEvent()
     {
-        // Arrange
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             var eventItem = CreateEvent("Концерт", Utc(2026, 8, 10), Utc(2026, 8, 10, 12));
 
-            // Act
             await events.AddAsync(eventItem);
+            await unitOfWork.SaveChangesAsync();
             var loaded = await events.GetByIdAsync(eventItem.Id);
 
-            // Assert
             Assert.NotNull(loaded);
             Assert.Equal(eventItem.Id, loaded.Id);
             Assert.Equal("Концерт", loaded.Title);
@@ -41,10 +39,39 @@ public class EventRepositoryTests
     }
 
     [Fact]
+    public async Task AddAsync_UnspecifiedKind_SavesWithoutError()
+    {
+        // даты без Z / Kind=Unspecified — конвертер в AppDbContext приводит к UTC
+        await _fixture.ResetDatabaseAsync();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
+        await using (context)
+        {
+            var start = new DateTime(2026, 12, 1, 10, 0, 0, DateTimeKind.Unspecified);
+            var end = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Unspecified);
+            var eventItem = Event.Create("Без зоны", null, start, end, 5);
+
+            await events.AddAsync(eventItem);
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        // новый контекст — иначе трекер отдаст исходную сущность с Kind=Unspecified
+        var (events2, _, _, context2) = _fixture.CreateRepositories();
+        await using (context2)
+        {
+            var from = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Unspecified);
+            var (items, total) = await events2.GetEventsAsync(null, from, null, 0, 10);
+
+            Assert.Equal(1, total);
+            Assert.Equal("Без зоны", items.Single().Title);
+            Assert.Equal(DateTimeKind.Utc, items.Single().StartAt.Kind);
+        }
+    }
+
+    [Fact]
     public async Task GetByIdAsync_NotFound_ReturnsNull()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, _, context) = _fixture.CreateRepositories();
         await using (context)
         {
             var loaded = await events.GetByIdAsync(Guid.NewGuid());
@@ -53,19 +80,18 @@ public class EventRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateAsync_ChangesTitleAndSeats()
+    public async Task Update_ChangesTitleAndSeats()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             var eventItem = CreateEvent("Старое", Utc(2026, 8, 10), Utc(2026, 8, 10, 12), seats: 5);
             await events.AddAsync(eventItem);
+            await unitOfWork.SaveChangesAsync();
 
-            eventItem.Title = "Новое";
-            eventItem.TotalSeats = 8;
-            eventItem.AvailableSeats = 8;
-            await events.UpdateAsync(eventItem);
+            eventItem.Update("Новое", null, Utc(2026, 8, 10), Utc(2026, 8, 10, 12), 8);
+            await unitOfWork.SaveChangesAsync();
 
             var loaded = await events.GetByIdAsync(eventItem.Id);
             Assert.Equal("Новое", loaded!.Title);
@@ -74,16 +100,18 @@ public class EventRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteAsync_RemovesEvent()
+    public async Task Delete_RemovesEvent()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             var eventItem = CreateEvent("Удалить", Utc(2026, 8, 10), Utc(2026, 8, 10, 12));
             await events.AddAsync(eventItem);
+            await unitOfWork.SaveChangesAsync();
 
-            await events.DeleteAsync(eventItem);
+            events.Delete(eventItem);
+            await unitOfWork.SaveChangesAsync();
 
             var loaded = await events.GetByIdAsync(eventItem.Id);
             Assert.Null(loaded);
@@ -94,12 +122,13 @@ public class EventRepositoryTests
     public async Task GetEventsAsync_FiltersByTitle()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             await events.AddAsync(CreateEvent("Концерт рок", Utc(2026, 8, 10), Utc(2026, 8, 10, 12)));
             await events.AddAsync(CreateEvent("Встреча", Utc(2026, 8, 11), Utc(2026, 8, 11, 12)));
             await events.AddAsync(CreateEvent("концерт джаз", Utc(2026, 8, 12), Utc(2026, 8, 12, 12)));
+            await unitOfWork.SaveChangesAsync();
 
             var (items, total) = await events.GetEventsAsync("концерт", null, null, 0, 10);
 
@@ -113,12 +142,13 @@ public class EventRepositoryTests
     public async Task GetEventsAsync_FiltersByFromAndTo()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             await events.AddAsync(CreateEvent("Раньше", Utc(2026, 7, 1), Utc(2026, 7, 1, 12)));
             await events.AddAsync(CreateEvent("В диапазоне", Utc(2026, 8, 10), Utc(2026, 8, 10, 12)));
             await events.AddAsync(CreateEvent("Позже", Utc(2026, 9, 1), Utc(2026, 9, 1, 12)));
+            await unitOfWork.SaveChangesAsync();
 
             var from = Utc(2026, 8, 1);
             var to = Utc(2026, 8, 31, 23);
@@ -133,13 +163,15 @@ public class EventRepositoryTests
     public async Task GetEventsAsync_Pagination_ReturnsCorrectPage()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             for (var i = 1; i <= 5; i++)
             {
                 await events.AddAsync(CreateEvent($"Событие {i}", Utc(2026, 8, i), Utc(2026, 8, i, 12)));
             }
+
+            await unitOfWork.SaveChangesAsync();
 
             var (page1, total1) = await events.GetEventsAsync(null, null, null, skip: 0, take: 2);
             var (page2, total2) = await events.GetEventsAsync(null, null, null, skip: 2, take: 2);
@@ -158,13 +190,14 @@ public class EventRepositoryTests
     public async Task GetEventsAsync_CombinedFiltersAndPagination()
     {
         await _fixture.ResetDatabaseAsync();
-        var (events, _, context) = _fixture.CreateRepositories();
+        var (events, _, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
             await events.AddAsync(CreateEvent("Митинг A", Utc(2026, 8, 1), Utc(2026, 8, 1, 12)));
             await events.AddAsync(CreateEvent("Митинг B", Utc(2026, 8, 2), Utc(2026, 8, 2, 12)));
             await events.AddAsync(CreateEvent("Митинг C", Utc(2026, 8, 3), Utc(2026, 8, 3, 12)));
             await events.AddAsync(CreateEvent("Другое", Utc(2026, 8, 2), Utc(2026, 8, 2, 12)));
+            await unitOfWork.SaveChangesAsync();
 
             var (items, total) = await events.GetEventsAsync(
                 "митинг",
