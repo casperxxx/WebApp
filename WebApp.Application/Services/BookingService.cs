@@ -1,3 +1,4 @@
+using WebApp.Application.Models;
 using WebApp.Application.Repositories;
 using WebApp.Domain.Entities;
 using WebApp.Domain.Exceptions;
@@ -11,20 +12,24 @@ internal class BookingService : IBookingService
 {
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    // сервисы больше не ходят в AppDbContext напрямую
     private readonly IEventRepository _eventRepository;
     private readonly IBookingRepository _bookingRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository)
+    public BookingService(
+        IEventRepository eventRepository,
+        IBookingRepository bookingRepository,
+        IUnitOfWork unitOfWork)
     {
         _eventRepository = eventRepository;
         _bookingRepository = bookingRepository;
+        _unitOfWork = unitOfWork;
     }
 
     /// <summary>
     /// Создаёт бронь в статусе Pending
     /// </summary>
-    public async Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<BookingResponse> CreateBookingAsync(Guid eventId)
     {
         await BookingLock.WaitAsync();
         try
@@ -41,10 +46,11 @@ internal class BookingService : IBookingService
             }
 
             var booking = Booking.CreatePending(eventId);
-            // AddAsync сохранит и бронь, и уменьшенные AvailableSeats
             await _bookingRepository.AddAsync(booking);
+            // одно сохранение: и бронь, и уменьшенные AvailableSeats
+            await _unitOfWork.SaveChangesAsync();
 
-            return booking;
+            return BookingResponse.From(booking);
         }
         finally
         {
@@ -55,7 +61,7 @@ internal class BookingService : IBookingService
     /// <summary>
     /// Возвращает бронь по Id
     /// </summary>
-    public async Task<Booking> GetBookingByIdAsync(Guid bookingId)
+    public async Task<BookingResponse> GetBookingByIdAsync(Guid bookingId)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId);
         if (booking is null)
@@ -63,6 +69,6 @@ internal class BookingService : IBookingService
             throw new NotFoundException($"Бронь с id {bookingId} не найдена");
         }
 
-        return booking;
+        return BookingResponse.From(booking);
     }
 }

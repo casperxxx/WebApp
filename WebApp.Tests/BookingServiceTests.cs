@@ -19,9 +19,10 @@ public class BookingServiceTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_dbName));
-        // регистрируем репозитории, сервисы больше не зависят от AppDbContext напрямую
+        // регистрируем репозитории, UnitOfWork и сервисы
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         _serviceProvider = services.BuildServiceProvider();
@@ -157,13 +158,16 @@ public class BookingServiceTests : IDisposable
     {
         using var scope = _serviceProvider.CreateScope();
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
         var created = await bookingService.CreateBookingAsync(eventItem.Id);
 
-        created.Confirm();
+        var entity = await context.Bookings.FindAsync(created.Id);
+        entity!.Confirm();
+        await context.SaveChangesAsync();
 
-        Assert.Equal(BookingStatus.Confirmed, created.Status);
-        Assert.NotNull(created.ProcessedAt);
+        Assert.Equal(BookingStatus.Confirmed, entity.Status);
+        Assert.NotNull(entity.ProcessedAt);
     }
 
     [Fact]
@@ -171,13 +175,16 @@ public class BookingServiceTests : IDisposable
     {
         using var scope = _serviceProvider.CreateScope();
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
         var created = await bookingService.CreateBookingAsync(eventItem.Id);
 
-        created.Reject();
+        var entity = await context.Bookings.FindAsync(created.Id);
+        entity!.Reject();
+        await context.SaveChangesAsync();
 
-        Assert.Equal(BookingStatus.Rejected, created.Status);
-        Assert.NotNull(created.ProcessedAt);
+        Assert.Equal(BookingStatus.Rejected, entity.Status);
+        Assert.NotNull(entity.ProcessedAt);
     }
 
     [Fact]
@@ -192,7 +199,8 @@ public class BookingServiceTests : IDisposable
         var loadedEvent = await context.Events.FindAsync(eventItem.Id);
         Assert.Equal(0, loadedEvent!.AvailableSeats);
 
-        booking.Reject();
+        var entity = await context.Bookings.FindAsync(booking.Id);
+        entity!.Reject();
         loadedEvent.ReleaseSeats();
         await context.SaveChangesAsync();
 
@@ -209,7 +217,8 @@ public class BookingServiceTests : IDisposable
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 1);
         var first = await bookingService.CreateBookingAsync(eventItem.Id);
 
-        first.Reject();
+        var entity = await context.Bookings.FindAsync(first.Id);
+        entity!.Reject();
         var loadedEvent = await context.Events.FindAsync(eventItem.Id);
         loadedEvent!.ReleaseSeats();
         await context.SaveChangesAsync();
@@ -275,7 +284,7 @@ public class BookingServiceTests : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    return (Success: false, Booking: (Booking?)null, Error: ex);
+                    return (Success: false, Booking: (WebApp.Application.Models.BookingResponse?)null, Error: ex);
                 }
             }))
             .ToArray();

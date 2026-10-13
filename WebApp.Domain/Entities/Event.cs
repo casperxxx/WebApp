@@ -1,3 +1,5 @@
+using WebApp.Domain.Exceptions;
+
 namespace WebApp.Domain.Entities;
 
 /// <summary>
@@ -14,62 +16,42 @@ public class Event
     /// <summary>
     /// Id события
     /// </summary>
-    public Guid Id { get; set; }
+    public Guid Id { get; private set; }
 
     /// <summary>
     /// Название события
     /// </summary>
-    public required string Title { get; set; }
+    public string Title { get; private set; }
 
     /// <summary>
     /// Описание события
     /// </summary>
-    public string? Description { get; set; }
+    public string? Description { get; private set; }
 
     /// <summary>
     /// Дата начала события
     /// </summary>
-    public DateTime StartAt { get; set; }
+    public DateTime StartAt { get; private set; }
 
     /// <summary>
     /// Дата завершения события
     /// </summary>
-    public DateTime EndAt { get; set; }
+    public DateTime EndAt { get; private set; }
 
     /// <summary>
     /// Всего мест
     /// </summary>
-    public int TotalSeats { get; set; }
+    public int TotalSeats { get; private set; }
 
     /// <summary>
     /// Сколько мест свободно
     /// </summary>
-    public int AvailableSeats { get; set; }
+    public int AvailableSeats { get; private set; }
 
     /// <summary>
     /// Брони на это событие
     /// </summary>
     public ICollection<Booking> Bookings { get; private set; }
-
-    /// <summary>
-    /// Данные для обновления события из DTO
-    /// </summary>
-    public static Event FromUpdate(
-        string title,
-        string? description,
-        DateTime startAt,
-        DateTime endAt,
-        int totalSeats)
-    {
-        return new Event
-        {
-            Title = title,
-            Description = description,
-            StartAt = startAt,
-            EndAt = endAt,
-            TotalSeats = totalSeats
-        };
-    }
 
     /// <summary>
     /// Создаёт событие, AvailableSeats = TotalSeats
@@ -81,9 +63,11 @@ public class Event
         DateTime endAt,
         int totalSeats)
     {
+        ValidateDates(startAt, endAt);
+
         if (totalSeats <= 0)
         {
-            throw new ArgumentException("TotalSeats должно быть больше нуля");
+            throw new DomainValidationException("TotalSeats должно быть больше нуля");
         }
 
         return new Event
@@ -96,6 +80,38 @@ public class Event
             TotalSeats = totalSeats,
             AvailableSeats = totalSeats
         };
+    }
+
+    /// <summary>
+    /// Обновляет данные события с проверкой занятых мест
+    /// </summary>
+    public void Update(
+        string title,
+        string? description,
+        DateTime startAt,
+        DateTime endAt,
+        int totalSeats)
+    {
+        ValidateDates(startAt, endAt);
+
+        if (totalSeats <= 0)
+        {
+            throw new DomainValidationException("TotalSeats должно быть больше нуля");
+        }
+
+        var reservedSeats = TotalSeats - AvailableSeats;
+        if (totalSeats < reservedSeats)
+        {
+            throw new DomainValidationException(
+                $"TotalSeats не может быть меньше числа занятых мест ({reservedSeats})");
+        }
+
+        Title = title;
+        Description = description;
+        StartAt = startAt;
+        EndAt = endAt;
+        TotalSeats = totalSeats;
+        AvailableSeats = totalSeats - reservedSeats;
     }
 
     /// <summary>
@@ -122,6 +138,15 @@ public class Event
         if (AvailableSeats > TotalSeats)
         {
             AvailableSeats = TotalSeats;
+        }
+    }
+
+    private static void ValidateDates(DateTime startAt, DateTime endAt)
+    {
+        if (endAt <= startAt)
+        {
+            throw new DomainValidationException(
+                "Дата и время завершения события должно быть позже времени начала.");
         }
     }
 }

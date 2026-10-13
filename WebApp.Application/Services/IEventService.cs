@@ -1,5 +1,4 @@
 using WebApp.Application.Models;
-using WebApp.Domain.Entities;
 
 namespace WebApp.Application.Services;
 
@@ -17,7 +16,7 @@ public interface IEventService
     /// <param name="page">Номер страницы</param>
     /// <param name="pageSize">Количество элементов на странице</param>
     /// <returns>Результат с пагинацией</returns>
-    Task<PaginatedResultDTO<Event>> GetEventsAsync(
+    Task<PaginatedResultDTO<EventResponse>> GetEventsAsync(
         string? title,
         DateTime? from,
         DateTime? to,
@@ -29,14 +28,14 @@ public interface IEventService
     /// </summary>
     /// <param name="id">Id события</param>
     /// <returns>Найденное событие</returns>
-    Task<Event> GetEventAsync(Guid id);
+    Task<EventResponse> GetEventAsync(Guid id);
 
     /// <summary>
     /// Создать событие из DTO
     /// </summary>
     /// <param name="request">Данные для создания события</param>
     /// <returns>Созданное событие</returns>
-    Task<Event> CreateEventAsync(EventDTO request);
+    Task<EventResponse> CreateEventAsync(EventDTO request);
 
     /// <summary>
     /// Изменить событие по id
@@ -44,7 +43,7 @@ public interface IEventService
     /// <param name="id">Id события</param>
     /// <param name="request">Новые данные события</param>
     /// <returns>Обновлённое событие</returns>
-    Task<Event> UpdateEventAsync(Guid id, EventDTO request);
+    Task<EventResponse> UpdateEventAsync(Guid id, EventDTO request);
 
     /// <summary>
     /// Удалить событие по id

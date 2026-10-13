@@ -58,21 +58,14 @@ internal sealed class EventRepository : IEventRepository
         return await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
-    public async Task AddAsync(Event eventItem, CancellationToken cancellationToken = default)
+    public Task AddAsync(Event eventItem, CancellationToken cancellationToken = default)
     {
         _context.Events.Add(eventItem);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task UpdateAsync(Event eventItem, CancellationToken cancellationToken = default)
-    {
-        // сущность уже отслеживается контекстом, просто сохраняем
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(Event eventItem, CancellationToken cancellationToken = default)
+    public void Delete(Event eventItem)
     {
         _context.Events.Remove(eventItem);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

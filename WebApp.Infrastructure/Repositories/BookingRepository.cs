@@ -30,15 +30,9 @@ internal sealed class BookingRepository : IBookingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task AddAsync(Booking booking, CancellationToken cancellationToken = default)
+    public Task AddAsync(Booking booking, CancellationToken cancellationToken = default)
     {
         _context.Bookings.Add(booking);
-        // сохраняет и бронь, и изменение AvailableSeats у отслеживаемого события
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

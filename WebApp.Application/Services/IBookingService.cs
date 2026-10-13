@@ -1,4 +1,4 @@
-using WebApp.Domain.Entities;
+using WebApp.Application.Models;
 
 namespace WebApp.Application.Services;
 
@@ -11,11 +11,11 @@ public interface IBookingService
     /// Создать бронь для события
     /// </summary>
     /// <param name="eventId">Id события</param>
-    Task<Booking> CreateBookingAsync(Guid eventId);
+    Task<BookingResponse> CreateBookingAsync(Guid eventId);
 
     /// <summary>
     /// Получить бронь по Id
     /// </summary>
     /// <param name="bookingId">Id брони</param>
-    Task<Booking> GetBookingByIdAsync(Guid bookingId);
+    Task<BookingResponse> GetBookingByIdAsync(Guid bookingId);
 }

@@ -10,8 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // навигации Event ↔ Booking без [JsonIgnore] в Domain
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     })
     .ConfigureApiBehaviorOptions(options =>
@@ -46,9 +44,17 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Спринт-7. Clean Architecture: Domain / Application / Infrastructure / Presentation"
     });
 
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
+    var presentationXml = Path.Combine(AppContext.BaseDirectory, "WebApp.xml");
+    if (File.Exists(presentationXml))
+    {
+        options.IncludeXmlComments(presentationXml);
+    }
+
+    var applicationXml = Path.Combine(AppContext.BaseDirectory, "WebApp.Application.xml");
+    if (File.Exists(applicationXml))
+    {
+        options.IncludeXmlComments(applicationXml);
+    }
 });
 
 // composition root: слои Application и Infrastructure

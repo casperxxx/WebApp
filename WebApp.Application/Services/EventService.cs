@@ -10,21 +10,22 @@ namespace WebApp.Application.Services;
 /// </summary>
 internal class EventService : IEventService
 {
-    // вместо AppDbContext работаем через репозиторий
     private readonly IEventRepository _eventRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     /// <summary>
     /// Создаёт сервис и получает репозиторий через DI
     /// </summary>
-    public EventService(IEventRepository eventRepository)
+    public EventService(IEventRepository eventRepository, IUnitOfWork unitOfWork)
     {
         _eventRepository = eventRepository;
+        _unitOfWork = unitOfWork;
     }
 
     /// <summary>
     /// Возвращает события с фильтрацией и пагинацией
     /// </summary>
-    public async Task<PaginatedResultDTO<Event>> GetEventsAsync(
+    public async Task<PaginatedResultDTO<EventResponse>> GetEventsAsync(
         string? title,
         DateTime? from,
         DateTime? to,
@@ -33,27 +34,27 @@ internal class EventService : IEventService
     {
         if (page < 1)
         {
-            throw new ArgumentException("page должен быть >= 1");
+            throw new DomainValidationException("page должен быть >= 1");
         }
 
         if (pageSize < 1)
         {
-            throw new ArgumentException("pageSize должен быть >= 1");
+            throw new DomainValidationException("pageSize должен быть >= 1");
         }
 
         if (pageSize > 100)
         {
-            throw new ArgumentException("pageSize должен быть <= 100");
+            throw new DomainValidationException("pageSize должен быть <= 100");
         }
 
         var skip = (page - 1) * pageSize;
         // данные берём из репозитория, валидацию page/pageSize оставляем в сервисе
         var (items, totalCount) = await _eventRepository.GetEventsAsync(title, from, to, skip, pageSize);
 
-        return new PaginatedResultDTO<Event>
+        return new PaginatedResultDTO<EventResponse>
         {
             TotalCount = totalCount,
-            Items = items,
+            Items = items.Select(EventResponse.From).ToList(),
             Page = page,
             PageSize = pageSize
         };
@@ -62,7 +63,7 @@ internal class EventService : IEventService
     /// <summary>
     /// Находит событие по Id
     /// </summary>
-    public async Task<Event> GetEventAsync(Guid id)
+    public async Task<EventResponse> GetEventAsync(Guid id)
     {
         var eventItem = await _eventRepository.GetByIdAsync(id);
         if (eventItem is null)
@@ -70,13 +71,13 @@ internal class EventService : IEventService
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        return eventItem;
+        return EventResponse.From(eventItem);
     }
 
     /// <summary>
     /// Создаёт событие через Event.Create
     /// </summary>
-    public async Task<Event> CreateEventAsync(EventDTO request)
+    public async Task<EventResponse> CreateEventAsync(EventDTO request)
     {
         var totalSeats = request.TotalSeats ?? 0;
         var eventItem = Event.Create(
@@ -86,16 +87,16 @@ internal class EventService : IEventService
             request.EndAt,
             totalSeats);
 
-        ValidateDates(eventItem);
         await _eventRepository.AddAsync(eventItem);
+        await _unitOfWork.SaveChangesAsync();
 
-        return eventItem;
+        return EventResponse.From(eventItem);
     }
 
     /// <summary>
     /// Обновляет данные события по Id
     /// </summary>
-    public async Task<Event> UpdateEventAsync(Guid id, EventDTO request)
+    public async Task<EventResponse> UpdateEventAsync(Guid id, EventDTO request)
     {
         var existing = await _eventRepository.GetByIdAsync(id);
         if (existing is null)
@@ -103,29 +104,16 @@ internal class EventService : IEventService
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        var eventItem = Event.FromUpdate(
+        existing.Update(
             request.Title,
             request.Description,
             request.StartAt,
             request.EndAt,
             request.TotalSeats ?? 0);
 
-        ValidateDates(eventItem);
+        await _unitOfWork.SaveChangesAsync();
 
-        var reservedSeats = existing.TotalSeats - existing.AvailableSeats;
-        var totalSeats = eventItem.TotalSeats > 0 ? eventItem.TotalSeats : existing.TotalSeats;
-
-        existing.Title = eventItem.Title;
-        existing.Description = eventItem.Description;
-        existing.StartAt = eventItem.StartAt;
-        existing.EndAt = eventItem.EndAt;
-        existing.TotalSeats = totalSeats;
-        // не затираем уже занятые места
-        existing.AvailableSeats = Math.Max(0, totalSeats - reservedSeats);
-
-        await _eventRepository.UpdateAsync(existing);
-
-        return existing;
+        return EventResponse.From(existing);
     }
 
     /// <summary>
@@ -139,14 +127,7 @@ internal class EventService : IEventService
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        await _eventRepository.DeleteAsync(eventItem);
-    }
-
-    private static void ValidateDates(Event eventItem)
-    {
-        if (eventItem.EndAt <= eventItem.StartAt)
-        {
-            throw new ArgumentException("Дата и время завершения события должно быть позже времени начала.");
-        }
+        _eventRepository.Delete(eventItem);
+        await _unitOfWork.SaveChangesAsync();
     }
 }
