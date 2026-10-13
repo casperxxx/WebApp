@@ -62,9 +62,9 @@ public class BookingBackgroundService : BackgroundService
             await Task.Delay(ProcessingDelay, stoppingToken);
 
             using var scope = _scopeFactory.CreateScope();
-            // получаем репозитории из scope, а не AppDbContext
             var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
             var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
             var booking = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
             if (booking is null || booking.Status != BookingStatus.Pending)
@@ -76,7 +76,7 @@ public class BookingBackgroundService : BackgroundService
             if (eventItem is null)
             {
                 booking.Reject();
-                await bookingRepository.SaveChangesAsync(stoppingToken);
+                await unitOfWork.SaveChangesAsync(stoppingToken);
                 _logger.LogWarning(
                     "Бронь {BookingId} отклонена: событие {EventId} не найдено",
                     booking.Id,
@@ -85,7 +85,7 @@ public class BookingBackgroundService : BackgroundService
             }
 
             booking.Confirm();
-            await bookingRepository.SaveChangesAsync(stoppingToken);
+            await unitOfWork.SaveChangesAsync(stoppingToken);
             _logger.LogInformation("Бронь {BookingId} обработана, статус Confirmed", booking.Id);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -98,9 +98,9 @@ public class BookingBackgroundService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                // отдельный scope на обработку ошибки
                 var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
                 var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
                 var booking = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
                 if (booking is null || booking.Status != BookingStatus.Pending)
@@ -113,7 +113,7 @@ public class BookingBackgroundService : BackgroundService
                 var eventItem = await eventRepository.GetByIdAsync(booking.EventId, stoppingToken);
                 eventItem?.ReleaseSeats();
 
-                await bookingRepository.SaveChangesAsync(stoppingToken);
+                await unitOfWork.SaveChangesAsync(stoppingToken);
             }
             catch (Exception innerEx)
             {

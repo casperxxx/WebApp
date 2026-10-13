@@ -24,17 +24,12 @@ public interface IEventRepository
     Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Добавить событие и сохранить
+    /// Добавить событие в контекст (без SaveChanges)
     /// </summary>
     Task AddAsync(Event eventItem, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Сохранить изменения по уже загруженному событию
+    /// Удалить событие из контекста (без SaveChanges)
     /// </summary>
-    Task UpdateAsync(Event eventItem, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Удалить событие и сохранить
-    /// </summary>
-    Task DeleteAsync(Event eventItem, CancellationToken cancellationToken = default);
+    void Delete(Event eventItem);
 }

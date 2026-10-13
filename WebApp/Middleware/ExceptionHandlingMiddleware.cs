@@ -56,7 +56,7 @@ public class ExceptionHandlingMiddleware
             title = "Нет свободных мест";
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.10";
         }
-        else if (exception is ArgumentException or ValidationException)
+        else if (exception is DomainValidationException or ValidationException)
         {
             statusCode = (int)HttpStatusCode.BadRequest;
             title = "Некорректный запрос";

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using WebApp.Domain.Entities;
+using WebApp.Application.Models;
 using WebApp.Application.Services;
 
 namespace WebApp.Controllers;
@@ -28,9 +28,9 @@ public class BookingsController : ControllerBase
     /// <response code="200">Бронь найдена</response>
     /// <response code="404">Бронь не найдена</response>
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(Booking), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<Booking>> GetById(Guid id)
+    public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {
         return Ok(await _bookingService.GetBookingByIdAsync(id));
     }

@@ -22,4 +22,13 @@
     <ProjectReference Include="..\WebApp.Infrastructure\WebApp.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- XML Application для описаний DTO в Swagger -->
+  <Target Name="CopyApplicationXml" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(MSBuildThisFileDirectory)..\WebApp.Application\bin\$(Configuration)\$(TargetFramework)\WebApp.Application.xml"
+      DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(MSBuildThisFileDirectory)..\WebApp.Application\bin\$(Configuration)\$(TargetFramework)\WebApp.Application.xml')" />
+  </Target>
+
 </Project>

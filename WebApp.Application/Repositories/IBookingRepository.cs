@@ -18,12 +18,7 @@ public interface IBookingRepository
     Task<List<Guid>> GetPendingIdsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Добавить бронь и сохранить (вместе с изменениями события в том же контексте)
+    /// Добавить бронь в контекст (без SaveChanges)
     /// </summary>
     Task AddAsync(Booking booking, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Сохранить изменения (Confirm / Reject и т.п.)
-    /// </summary>
-    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
