@@ -372,8 +372,8 @@ public class EventServiceTests : IDisposable
             new DateTime(2026, 7, 10, 12, 0, 0),
             totalSeats: 2));
 
-        await bookingService.CreateBookingAsync(created.Id);
-        await bookingService.CreateBookingAsync(created.Id);
+        await bookingService.CreateBookingAsync(created.Id, Guid.NewGuid());
+        await bookingService.CreateBookingAsync(created.Id, Guid.NewGuid());
 
         var shrink = CreateRequest(
             "Test",

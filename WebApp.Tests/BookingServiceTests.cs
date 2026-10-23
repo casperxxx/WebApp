@@ -12,6 +12,7 @@ namespace WebApp.Tests;
 // Тесты для BookingService
 public class BookingServiceTests : IDisposable
 {
+    private readonly Guid _userId = Guid.NewGuid();
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _serviceProvider;
 
@@ -57,7 +58,7 @@ public class BookingServiceTests : IDisposable
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
 
-        var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+        var booking = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         Assert.NotEqual(Guid.Empty, booking.Id);
         Assert.Equal(eventItem.Id, booking.EventId);
@@ -74,7 +75,7 @@ public class BookingServiceTests : IDisposable
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 5);
 
-        await bookingService.CreateBookingAsync(eventItem.Id);
+        await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var updated = await context.Events.FindAsync(eventItem.Id);
         Assert.Equal(4, updated!.AvailableSeats);
@@ -88,9 +89,9 @@ public class BookingServiceTests : IDisposable
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 3);
 
-        var booking1 = await bookingService.CreateBookingAsync(eventItem.Id);
-        var booking2 = await bookingService.CreateBookingAsync(eventItem.Id);
-        var booking3 = await bookingService.CreateBookingAsync(eventItem.Id);
+        var booking1 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+        var booking2 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+        var booking3 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         Assert.Equal(3, context.Bookings.Count());
         var updated = await context.Events.FindAsync(eventItem.Id);
@@ -108,10 +109,10 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 1);
-        await bookingService.CreateBookingAsync(eventItem.Id);
+        await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         await Assert.ThrowsAsync<NoAvailableSeatsException>(
-            () => bookingService.CreateBookingAsync(eventItem.Id));
+            () => bookingService.CreateBookingAsync(eventItem.Id, _userId));
 
         var updated = await context.Events.FindAsync(eventItem.Id);
         Assert.Equal(0, updated!.AvailableSeats);
@@ -126,9 +127,9 @@ public class BookingServiceTests : IDisposable
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
 
-        var booking1 = await bookingService.CreateBookingAsync(eventItem.Id);
-        var booking2 = await bookingService.CreateBookingAsync(eventItem.Id);
-        var booking3 = await bookingService.CreateBookingAsync(eventItem.Id);
+        var booking1 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+        var booking2 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+        var booking3 = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         Assert.Equal(3, context.Bookings.Count());
         Assert.NotEqual(booking1.Id, booking2.Id);
@@ -144,7 +145,7 @@ public class BookingServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var eventItem = await CreateTestEventAsync(scope);
-        var created = await bookingService.CreateBookingAsync(eventItem.Id);
+        var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var booking = await bookingService.GetBookingByIdAsync(created.Id);
 
@@ -160,7 +161,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
-        var created = await bookingService.CreateBookingAsync(eventItem.Id);
+        var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var entity = await context.Bookings.FindAsync(created.Id);
         entity!.Confirm();
@@ -177,7 +178,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope);
-        var created = await bookingService.CreateBookingAsync(eventItem.Id);
+        var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var entity = await context.Bookings.FindAsync(created.Id);
         entity!.Reject();
@@ -194,7 +195,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 1);
-        var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+        var booking = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var loadedEvent = await context.Events.FindAsync(eventItem.Id);
         Assert.Equal(0, loadedEvent!.AvailableSeats);
@@ -215,7 +216,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventItem = await CreateTestEventAsync(scope, totalSeats: 1);
-        var first = await bookingService.CreateBookingAsync(eventItem.Id);
+        var first = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         var entity = await context.Bookings.FindAsync(first.Id);
         entity!.Reject();
@@ -223,7 +224,7 @@ public class BookingServiceTests : IDisposable
         loadedEvent!.ReleaseSeats();
         await context.SaveChangesAsync();
 
-        var second = await bookingService.CreateBookingAsync(eventItem.Id);
+        var second = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
         Assert.Equal(BookingStatus.Pending, second.Status);
         var updated = await context.Events.FindAsync(eventItem.Id);
@@ -238,7 +239,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => bookingService.CreateBookingAsync(Guid.NewGuid()));
+            () => bookingService.CreateBookingAsync(Guid.NewGuid(), _userId));
     }
 
     [Fact]
@@ -252,7 +253,7 @@ public class BookingServiceTests : IDisposable
         await eventService.DeleteEventAsync(eventItem.Id);
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => bookingService.CreateBookingAsync(eventItem.Id));
+            () => bookingService.CreateBookingAsync(eventItem.Id, _userId));
     }
 
     [Fact]
@@ -279,7 +280,7 @@ public class BookingServiceTests : IDisposable
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
                 try
                 {
-                    var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+                    var booking = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
                     return (Success: true, Booking: booking, Error: (Exception?)null);
                 }
                 catch (Exception ex)
@@ -317,7 +318,7 @@ public class BookingServiceTests : IDisposable
             {
                 using var scope = _serviceProvider.CreateScope();
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
-                return await bookingService.CreateBookingAsync(eventItem.Id);
+                return await bookingService.CreateBookingAsync(eventItem.Id, _userId);
             }))
             .ToArray();
 

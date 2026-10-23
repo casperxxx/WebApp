@@ -11,7 +11,8 @@ public interface IBookingService
     /// Создать бронь для события
     /// </summary>
     /// <param name="eventId">Id события</param>
-    Task<BookingResponse> CreateBookingAsync(Guid eventId);
+    /// <param name="userId">Id пользователя, который бронирует</param>
+    Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId);
 
     /// <summary>
     /// Получить бронь по Id

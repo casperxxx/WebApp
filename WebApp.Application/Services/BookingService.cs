@@ -29,7 +29,7 @@ internal class BookingService : IBookingService
     /// <summary>
     /// Создаёт бронь в статусе Pending
     /// </summary>
-    public async Task<BookingResponse> CreateBookingAsync(Guid eventId)
+    public async Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId)
     {
         await BookingLock.WaitAsync();
         try
@@ -45,7 +45,7 @@ internal class BookingService : IBookingService
                 throw new NoAvailableSeatsException($"Нет свободных мест для события {eventItem.Title} c id:{eventId}");
             }
 
-            var booking = Booking.CreatePending(eventId);
+            var booking = Booking.CreatePending(eventId, userId);
             await _bookingRepository.AddAsync(booking);
             // одно сохранение: и бронь, и уменьшенные AvailableSeats
             await _unitOfWork.SaveChangesAsync();
