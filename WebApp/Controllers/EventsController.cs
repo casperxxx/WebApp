@@ -122,7 +122,10 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookingResponse>> Book(Guid id)
     {
-        var booking = await _bookingService.CreateBookingAsync(id);
+        // userId из JWT claims — на этапе подключения аутентификации;
+        // пока передаём фиксированный Id, чтобы сборка и старые тесты API не ломались
+        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var booking = await _bookingService.CreateBookingAsync(id, userId);
         return Accepted($"/bookings/{booking.Id}", booking);
     }
 }

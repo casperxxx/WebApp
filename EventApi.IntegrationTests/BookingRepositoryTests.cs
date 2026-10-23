@@ -29,7 +29,7 @@ public class BookingRepositoryTests
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var booking = Booking.CreatePending(eventItem.Id);
+            var booking = Booking.CreatePending(eventItem.Id, Guid.NewGuid());
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -56,7 +56,7 @@ public class BookingRepositoryTests
             var tracked = await events.GetByIdAsync(eventItem.Id);
             Assert.True(tracked!.TryReserveSeats());
 
-            var booking = Booking.CreatePending(tracked.Id);
+            var booking = Booking.CreatePending(tracked.Id, Guid.NewGuid());
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -92,9 +92,9 @@ public class BookingRepositoryTests
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var pending1 = Booking.CreatePending(eventItem.Id);
-            var pending2 = Booking.CreatePending(eventItem.Id);
-            var confirmed = Booking.CreatePending(eventItem.Id);
+            var pending1 = Booking.CreatePending(eventItem.Id, Guid.NewGuid());
+            var pending2 = Booking.CreatePending(eventItem.Id, Guid.NewGuid());
+            var confirmed = Booking.CreatePending(eventItem.Id, Guid.NewGuid());
             await bookings.AddAsync(pending1);
             await bookings.AddAsync(pending2);
             await bookings.AddAsync(confirmed);
@@ -123,7 +123,7 @@ public class BookingRepositoryTests
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var booking = Booking.CreatePending(eventItem.Id);
+            var booking = Booking.CreatePending(eventItem.Id, Guid.NewGuid());
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -149,7 +149,7 @@ public class BookingRepositoryTests
 
             var tracked = await events.GetByIdAsync(eventItem.Id);
             tracked!.TryReserveSeats();
-            var booking = Booking.CreatePending(tracked.Id);
+            var booking = Booking.CreatePending(tracked.Id, Guid.NewGuid());
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 

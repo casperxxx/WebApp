@@ -18,6 +18,11 @@ public class BookingResponse
     public Guid EventId { get; set; }
 
     /// <summary>
+    /// Id пользователя, создавшего бронь
+    /// </summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>
     /// Статус брони
     /// </summary>
     public BookingStatus Status { get; set; }
@@ -39,6 +44,7 @@ public class BookingResponse
     {
         Id = booking.Id,
         EventId = booking.EventId,
+        UserId = booking.UserId,
         Status = booking.Status,
         CreatedAt = booking.CreatedAt,
         ProcessedAt = booking.ProcessedAt

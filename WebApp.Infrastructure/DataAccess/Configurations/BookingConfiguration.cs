@@ -14,6 +14,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.Id).ValueGeneratedNever();
 
         builder.Property(b => b.EventId).IsRequired();
+        builder.Property(b => b.UserId).IsRequired();
 
         builder.Property(b => b.Status)
             .IsRequired()
