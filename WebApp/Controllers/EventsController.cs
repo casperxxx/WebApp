@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Application.Models;
 using WebApp.Application.Services;
+using WebApp.Extensions;
 
 namespace WebApp.Controllers;
 
@@ -34,6 +36,7 @@ public class EventsController : ControllerBase
     /// <response code="200">Список событий успешно получен</response>
     /// <response code="400">Ошибка получения списка</response>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(PaginatedResultDTO<EventResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PaginatedResultDTO<EventResponse>>> GetAll(
         [FromQuery] string? title,
@@ -53,6 +56,7 @@ public class EventsController : ControllerBase
     /// <response code="200">Событие успешно найдено</response>
     /// <response code="404">Событие не найдено</response>
     [HttpGet("{id}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(EventResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetById(Guid id)
@@ -67,9 +71,14 @@ public class EventsController : ControllerBase
     /// <returns>Созданное событие</returns>
     /// <response code="201">Событие успешно создано</response>
     /// <response code="400">Некорректные данные запроса</response>
+    /// <response code="401">Нет токена</response>
+    /// <response code="403">Недостаточно прав (нужна роль Admin)</response>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(EventResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> Create(EventDTO request)
     {
         var eventItem = await _eventService.CreateEventAsync(request);
@@ -84,10 +93,15 @@ public class EventsController : ControllerBase
     /// <returns>Обновлённое событие</returns>
     /// <response code="200">Событие успешно обновлено</response>
     /// <response code="400">Некорректные данные запроса</response>
+    /// <response code="401">Нет токена</response>
+    /// <response code="403">Недостаточно прав (нужна роль Admin)</response>
     /// <response code="404">Событие не найдено</response>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(EventResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(Guid id, EventDTO request)
     {
@@ -100,9 +114,14 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="id">Идентификатор события</param>
     /// <response code="204">Событие успешно удалено</response>
+    /// <response code="401">Нет токена</response>
+    /// <response code="403">Недостаточно прав (нужна роль Admin)</response>
     /// <response code="404">Событие не найдено</response>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -115,16 +134,20 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="id">Id события</param>
     /// <response code="202">Бронь создана, обработка ещё идёт</response>
+    /// <response code="400">Событие уже началось</response>
+    /// <response code="401">Нет токена</response>
     /// <response code="404">Событие не найдено</response>
+    /// <response code="409">Нет мест или превышен лимит броней</response>
     [HttpPost("{id}/book")]
+    [Authorize]
     [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookingResponse>> Book(Guid id)
     {
-        // userId из JWT claims — на этапе подключения аутентификации;
-        // пока передаём фиксированный Id, чтобы сборка и старые тесты API не ломались
-        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var userId = User.GetUserId();
         var booking = await _bookingService.CreateBookingAsync(id, userId);
         return Accepted($"/bookings/{booking.Id}", booking);
     }
