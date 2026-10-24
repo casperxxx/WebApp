@@ -35,4 +35,12 @@ internal sealed class BookingRepository : IBookingRepository
         _context.Bookings.Add(booking);
         return Task.CompletedTask;
     }
+
+    public async Task<int> CountActiveByUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Bookings.CountAsync(
+            b => b.UserId == userId
+                 && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed),
+            cancellationToken);
+    }
 }
