@@ -19,4 +19,12 @@ public interface IBookingService
     /// </summary>
     /// <param name="bookingId">Id брони</param>
     Task<BookingResponse> GetBookingByIdAsync(Guid bookingId);
+
+    /// <summary>
+    /// Отменить бронь (владелец или администратор)
+    /// </summary>
+    /// <param name="bookingId">Id брони</param>
+    /// <param name="currentUserId">Id текущего пользователя</param>
+    /// <param name="isAdmin">Является ли текущий пользователь администратором</param>
+    Task CancelBookingAsync(Guid bookingId, Guid currentUserId, bool isAdmin);
 }
