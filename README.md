@@ -1,34 +1,34 @@
 # WebApp
 
-API для работы с событиями и бронированиями. Данные хранятся в PostgreSQL через Entity Framework Core. Схема БД управляется **миграциями** (`Migrate()`), а не `EnsureCreated()`.
+API для событий и бронирований. Данные в PostgreSQL, схема через миграции EF Core (`Migrate()`).
 
 Ссылка на репозиторий: https://github.com/casperxxx/WebApp  
-Рабочая ветка: sprint-7
+Ветка: sprint-8
 
-## Структура решения (Clean Architecture)
+В спринте 8 добавлены пользователи, JWT и роли Admin / User.
 
-Солюшен разделён на четыре проекта. Зависимости направлены только «внутрь»:
+## Структура решения
 
-| Слой | Проект | Назначение |
-|---|---|---|
-| Domain | `WebApp.Domain` | Сущности (`Event`, `Booking`, `BookingStatus`), доменные исключения. Без ссылок на фреймворки |
-| Application | `WebApp.Application` | Use cases (сервисы), порты (`IEventRepository`, `IBookingRepository`), DTO, фоновая логика бронирований. Зависит только от Domain |
-| Infrastructure | `WebApp.Infrastructure` | `AppDbContext`, Fluent-конфигурации, миграции, реализации репозиториев, EF/Npgsql. Зависит от Application и Domain |
-| Presentation | `WebApp` | Контроллеры, middleware ошибок, Swagger, composition root (`Program.cs`) |
+Четыре проекта (зависимости только «внутрь»):
 
-В `Program.cs` регистрация идёт через `AddApplication()` и `AddInfrastructure()`.  
-У **Application нет ссылки на Infrastructure** — только через интерфейсы портов.
+- **WebApp.Domain** — сущности (`Event`, `Booking`, `User`), исключения
+- **WebApp.Application** — сервисы, интерфейсы репозиториев, DTO, фоновый сервис броней
+- **WebApp.Infrastructure** — DbContext, миграции, репозитории, хеш пароля, генерация JWT
+- **WebApp** — контроллеры, middleware ошибок, Swagger, `Program.cs`
+
+В `Program.cs` вызываются `AddApplication()` и `AddInfrastructure()`.  
+Application **не ссылается** на Infrastructure.
 
 ## Как запустить
 
 1. Склонировать репозиторий
-2. Запустить PostgreSQL в Docker (из корня репозитория):
+2. Поднять PostgreSQL:
 
 ```
 docker compose up -d
 ```
 
-3. Выполнить команды:
+3. Собрать и запустить:
 
 ```
 dotnet restore
@@ -36,155 +36,136 @@ dotnet build
 dotnet run --project WebApp/WebApp.csproj
 ```
 
-Сайт откроется на http://localhost:5176
-
+Приложение: http://localhost:5176  
 Swagger: http://localhost:5176/swagger
 
-При старте приложение применяет миграции (`ApplyMigrations()` → `db.Database.Migrate()`): создаются таблицы `events` и `bookings`, если их ещё нет.
+При старте накатываются миграции (таблицы `events`, `bookings`, `users`).
 
-Строка подключения в `WebApp/appsettings.json`:
+Строка подключения (`WebApp/appsettings.json`):
 
 ```
 Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
 ```
 
-Порт **5433** на хосте — чтобы не конфликтовать с локальным PostgreSQL на 5432.
+Порт 5433 — чтобы не пересекаться с локальным Postgres на 5432.
 
-## Миграции EF Core
+## Роли
 
-Пакет `Microsoft.EntityFrameworkCore.Design` подключён в `WebApp.Infrastructure`.  
-Миграции лежат в `WebApp.Infrastructure/DataAccess/Migrations`.
+- **Admin** — создаёт / меняет / удаляет события, может отменить любую бронь
+- **User** — бронирует события и отменяет только свои брони
 
-Создать новую миграцию:
+Список событий (GET) доступен без токена.  
+Создание/изменение/удаление событий — только Admin (без токена 401, обычный пользователь 403).  
+Бронь и работа с `/bookings` — нужна аутентификация.
+
+Дополнительно при бронировании:
+- нельзя бронировать уже начавшееся событие (400)
+- не больше 10 активных броней на пользователя (Pending + Confirmed), иначе 409
+
+## JWT
+
+Настройки в `WebApp/appsettings.json`, секция `Jwt`:
+
+```json
+"Jwt": {
+  "Secret": "MySecretKey_sprint-8_JWT_token!!",
+  "Issuer": "WebApp",
+  "Audience": "WebApp",
+  "ExpirationMinutes": 60
+}
+```
+
+Секрет должен быть не короче 32 символов.  
+В учебном проекте он лежит в конфиге. В реальном проекте лучше вынести в переменные окружения или User Secrets и не светить в git.
+
+### Как получить токен в Swagger
+
+1. Открыть http://localhost:5176/swagger
+2. `POST /auth/register` — например:
+
+```json
+{
+  "login": "admin1",
+  "password": "password",
+  "role": "Admin"
+}
+```
+
+Роль можно не указывать — тогда будет User. Для проверки удобно зарегистрировать и Admin, и User.
+
+3. `POST /auth/login` — в ответе поле `token`
+4. Кнопка **Authorize** → вставить токен (часто в формате `Bearer <token>`)
+5. Дальше вызывать защищённые методы
+
+Проверка: без токена создать событие → 401; под User → 403; под Admin — можно создать событие, забронировать и отменить бронь.
+
+## Миграции
 
 ```
 dotnet ef migrations add ИмяМиграции --project WebApp.Infrastructure --startup-project WebApp --output-dir DataAccess/Migrations
 ```
 
-Применить миграции можно:
-- автоматически при запуске приложения (`ApplyMigrations()` в `Program.cs`);
-- или вручную:
+Применение: при запуске приложения или
 
 ```
 dotnet ef database update --project WebApp.Infrastructure --startup-project WebApp
 ```
 
-Начальная миграция: `InitialCreate` (таблицы `events`, `bookings` и внешний ключ).
+Есть `InitialCreate` и `AddUsersAndBookingUserId` (таблица users и поле UserId у броней).
 
-## Как запустить тесты
+## Тесты
 
 ```
 dotnet test
 ```
 
-Нужен **запущенный Docker** — интеграционные тесты поднимают PostgreSQL через Testcontainers.
+Нужен запущенный Docker (Testcontainers для интеграционных тестов).
 
-Что проверяется:
-- **WebApp.Tests** — юнит-тесты сервисов на InMemory EF Core; `ErrorResponseTests` подменяют БД через `CustomWebApplicationFactory` (ссылки на Domain / Application / Infrastructure / Presentation)
-- **EventApi.IntegrationTests** — интеграционные тесты репозиториев на реальном PostgreSQL (Testcontainers): миграции, CRUD, фильтры, пагинация (ссылки на Domain / Application / Infrastructure)
+- **WebApp.Tests** — сервисы, auth, проверки 401/403
+- **EventApi.IntegrationTests** — репозитории на PostgreSQL
 
-## Репозитории
+## API
 
-Порты (`IEventRepository` / `IBookingRepository`) объявлены в **Application**.  
-Реализации — в **Infrastructure**. Сервисы и фоновый сервис не обращаются к `AppDbContext` напрямую.
-
-## Методы API
+Auth (без токена):
+- POST /auth/register — 204 / 400
+- POST /auth/login — 200 (token) / 400
 
 События:
-- GET /events — получить события с фильтрацией и пагинацией (200)
-- GET /events/{id} — получить одно событие (200 или 404)
-- POST /events — создать событие (201)
-- PUT /events/{id} — изменить событие (200, 400 или 404)
-- DELETE /events/{id} — удалить событие (204 или 404)
-- POST /events/{id}/book — создать бронь на событие (202, 404 или 409)
+- GET /events, GET /events/{id}
+- POST /events, PUT /events/{id}, DELETE /events/{id} — только Admin
+- POST /events/{id}/book — нужна аутентификация (202 / 400 / 401 / 404 / 409)
 
-Бронирования:
-- GET /bookings/{id} — получить бронь по Id (200 или 404)
+Брони:
+- GET /bookings/{id} — нужна аутентификация
+- DELETE /bookings/{id} — отмена (своя или любая у Admin)
 
-## Модель события
+### Параметры GET /events
 
-- id — Id события
-- title — название
-- description — описание (необязательное)
-- startAt / endAt — даты начала и окончания
-- totalSeats — общее количество мест (обязательное при создании, должно быть больше 0)
-- availableSeats — сколько мест свободно (при создании равно totalSeats)
+- title — поиск по названию
+- from / to — фильтр по датам
+- page (по умолчанию 1), pageSize (по умолчанию 10, максимум 100)
 
-## GET /events — параметры
+Пример: `GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5`
 
-- title — поиск по названию (частичное совпадение, без учёта регистра)
-- from — события, которые начинаются не раньше указанной даты
-- to — события, которые заканчиваются не позже указанной даты
-- page — номер страницы (по умолчанию 1, минимум 1)
-- pageSize — количество элементов на странице (по умолчанию 10, от 1 до 100)
+## Модели (кратко)
 
-Пример:
+Событие: id, title, description, startAt, endAt, totalSeats, availableSeats.
 
-```
-GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5
-```
+Пользователь: id, login, passwordHash (SHA-256), role (User / Admin).
 
-## Бронирования
+Бронь: id, eventId, userId, status (Pending / Confirmed / Rejected / Cancelled), createdAt, processedAt.
 
-Модель Booking:
-- id — Id брони
-- eventId — Id события
-- status — статус (Pending, Confirmed, Rejected)
-- createdAt — когда создали
-- processedAt — когда обработали (может быть null)
+## Фон и синхронизация
 
-Статусы:
-- Pending — бронь создана, ждёт обработки
-- Confirmed — бронь подтверждена
-- Rejected — бронь отклонена (например, событие удалили до обработки)
+`BookingBackgroundService` берёт Pending-брони, ждёт пару секунд и ставит Confirmed или Rejected (с возвратом места).  
+В `BookingService` для создания брони используется static `SemaphoreSlim` (вместо `lock`, потому что внутри есть `await`).
 
-### POST /events/{id}/book
+## Ошибки
 
-Сразу возвращает 202 Accepted и бронь в статусе Pending.  
-В заголовке Location будет ссылка на бронь, например `/bookings/{bookingId}`.
-
-При создании брони уменьшается availableSeats.
-
-Ответы:
-- 202 — бронь создана
-- 404 — события с таким id нет
-- 409 — свободных мест нет (Conflict)
-
-### GET /bookings/{id}
-
-Возвращает текущее состояние брони. Если брони нет — 404.
-
-## Фоновая обработка
-
-В фоне работает BookingBackgroundService (слой Application):
-1. берёт все брони со статусом Pending
-2. обрабатывает их параллельно через Task.WhenAll
-3. для каждой брони ждёт пару секунд (имитация внешней системы)
-4. если событие есть — ставит Confirmed и заполняет processedAt
-5. если события уже нет или произошла ошибка — ставит Rejected и возвращает место через ReleaseSeats
-
-Поэтому сразу после создания GET вернёт Pending, а через несколько секунд — уже Confirmed (или Rejected).
-
-Фоновый сервис — синглтон. Репозитории (и DbContext) — scoped, поэтому используется `IServiceScopeFactory`.
-
-## Синхронизация
-
-В `BookingService` используется **static SemaphoreSlim** — критическая секция «проверка мест + создание брони». Обычный `lock` нельзя, потому что внутри есть `await`.
-
-## Пример сценария (проверка через Swagger)
-
-1. Запустить `docker compose up -d` и приложение
-2. POST /events — создать событие
-3. POST /events/{id}/book — создать бронь
-4. GET /events/{id} и GET /bookings/{id} — проверить данные
-5. Перезапустить приложение — данные остаются в PostgreSQL
-
-## Формат ошибки
-
-При ошибках API возвращает Problem Details (RFC 7807), Content-Type: `application/problem+json`.
-
-Коды:
-- 400 — ошибка валидации / некорректные параметры (в том числе totalSeats <= 0)
+Ответ в формате Problem Details (`application/problem+json`):
+- 400 — валидация, прошедшее событие, неверный логин/пароль
+- 401 — нет токена
+- 403 — нет прав
 - 404 — не найдено
-- 409 — нет свободных мест
+- 409 — нет мест или лимит броней
 - 500 — внутренняя ошибка
