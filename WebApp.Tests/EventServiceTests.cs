@@ -366,10 +366,11 @@ public class EventServiceTests : IDisposable
         var service = CreateService(scope);
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
+        var start = DateTime.UtcNow.AddDays(30);
         var created = await service.CreateEventAsync(CreateRequest(
             "Test",
-            new DateTime(2026, 7, 10, 10, 0, 0),
-            new DateTime(2026, 7, 10, 12, 0, 0),
+            start,
+            start.AddHours(2),
             totalSeats: 2));
 
         await bookingService.CreateBookingAsync(created.Id, Guid.NewGuid());
@@ -377,8 +378,8 @@ public class EventServiceTests : IDisposable
 
         var shrink = CreateRequest(
             "Test",
-            new DateTime(2026, 7, 10, 10, 0, 0),
-            new DateTime(2026, 7, 10, 12, 0, 0),
+            start,
+            start.AddHours(2),
             totalSeats: 1);
 
         await Assert.ThrowsAsync<DomainValidationException>(() =>
