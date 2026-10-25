@@ -1,3 +1,5 @@
+using WebApp.Domain.Exceptions;
+
 namespace WebApp.Domain.Entities;
 
 /// <summary>
@@ -25,6 +27,16 @@ public class Booking
     public Event? Event { get; private set; }
 
     /// <summary>
+    /// Id пользователя, создавшего бронь
+    /// </summary>
+    public Guid UserId { get; private set; }
+
+    /// <summary>
+    /// Пользователь, создавший бронь
+    /// </summary>
+    public User? User { get; private set; }
+
+    /// <summary>
     /// Текущий статус брони
     /// </summary>
     public BookingStatus Status { get; private set; }
@@ -42,12 +54,18 @@ public class Booking
     /// <summary>
     /// Создаёт бронь в статусе Pending
     /// </summary>
-    public static Booking CreatePending(Guid eventId)
+    public static Booking CreatePending(Guid eventId, Guid userId)
     {
+        if (userId == Guid.Empty)
+        {
+            throw new DomainValidationException("UserId не может быть пустым");
+        }
+
         return new Booking
         {
             Id = Guid.NewGuid(),
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             ProcessedAt = null
@@ -69,6 +87,25 @@ public class Booking
     public void Reject()
     {
         Status = BookingStatus.Rejected;
+        ProcessedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Отменить бронь (повторная отмена и отмена отклонённой — ошибка)
+    /// </summary>
+    public void Cancel()
+    {
+        if (Status == BookingStatus.Cancelled)
+        {
+            throw new DomainValidationException("Бронь уже отменена");
+        }
+
+        if (Status == BookingStatus.Rejected)
+        {
+            throw new DomainValidationException("Отклонённую бронь нельзя отменить");
+        }
+
+        Status = BookingStatus.Cancelled;
         ProcessedAt = DateTime.UtcNow;
     }
 }

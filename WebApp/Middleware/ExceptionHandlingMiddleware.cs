@@ -50,13 +50,21 @@ public class ExceptionHandlingMiddleware
             title = "Не найдено";
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.5";
         }
-        else if (exception is NoAvailableSeatsException)
+        else if (exception is ForbiddenException)
+        {
+            statusCode = (int)HttpStatusCode.Forbidden;
+            title = "Доступ запрещён";
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.4";
+        }
+        else if (exception is NoAvailableSeatsException or BookingLimitExceededException)
         {
             statusCode = (int)HttpStatusCode.Conflict;
-            title = "Нет свободных мест";
+            title = "Конфликт";
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.10";
         }
-        else if (exception is DomainValidationException or ValidationException)
+        else if (exception is EventAlreadyStartedException
+                 or DomainValidationException
+                 or ValidationException)
         {
             statusCode = (int)HttpStatusCode.BadRequest;
             title = "Некорректный запрос";
