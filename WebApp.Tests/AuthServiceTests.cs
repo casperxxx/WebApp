@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +20,10 @@ namespace WebApp.Tests;
 /// </summary>
 public class AuthServiceTests : IDisposable
 {
+    private const string JwtSecret = "TestSecretKey_for_unit_tests_min32!!";
+    private const string JwtIssuer = "WebApp";
+    private const string JwtAudience = "WebApp";
+
     private readonly ServiceProvider _serviceProvider;
 
     public AuthServiceTests()
@@ -25,9 +31,9 @@ public class AuthServiceTests : IDisposable
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:Secret"] = "MySecretKey_sprint-8_JWT_token!!",
-                ["Jwt:Issuer"] = "WebApp",
-                ["Jwt:Audience"] = "WebApp",
+                ["Jwt:Secret"] = JwtSecret,
+                ["Jwt:Issuer"] = JwtIssuer,
+                ["Jwt:Audience"] = JwtAudience,
                 ["Jwt:ExpirationMinutes"] = "60"
             })
             .Build();
@@ -66,6 +72,15 @@ public class AuthServiceTests : IDisposable
         });
 
         Assert.False(string.IsNullOrWhiteSpace(result.Token));
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.Token);
+        Assert.Equal(JwtIssuer, jwt.Issuer);
+        Assert.Contains(JwtAudience, jwt.Audiences);
+        Assert.Equal("student", jwt.Claims.First(c => c.Type == ClaimTypes.Name).Value);
+        Assert.Equal(UserRole.User.ToString(), jwt.Claims.First(c => c.Type == ClaimTypes.Role).Value);
+        Assert.True(Guid.TryParse(
+            jwt.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value,
+            out _));
     }
 
     [Fact]

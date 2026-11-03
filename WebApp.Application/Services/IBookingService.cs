@@ -15,10 +15,12 @@ public interface IBookingService
     Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId);
 
     /// <summary>
-    /// Получить бронь по Id
+    /// Получить бронь по Id (владелец или администратор)
     /// </summary>
     /// <param name="bookingId">Id брони</param>
-    Task<BookingResponse> GetBookingByIdAsync(Guid bookingId);
+    /// <param name="currentUserId">Id текущего пользователя</param>
+    /// <param name="isAdmin">Является ли текущий пользователь администратором</param>
+    Task<BookingResponse> GetBookingByIdAsync(Guid bookingId, Guid currentUserId, bool isAdmin);
 
     /// <summary>
     /// Отменить бронь (владелец или администратор)

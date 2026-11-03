@@ -51,8 +51,8 @@ Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
 
 ## Роли
 
-- **Admin** — создаёт / меняет / удаляет события, может отменить любую бронь
-- **User** — бронирует события и отменяет только свои брони
+- **Admin** — создаёт / меняет / удаляет события, может смотреть и отменять любую бронь
+- **User** — бронирует события; смотрит и отменяет только свои брони
 
 Список событий (GET) доступен без токена.  
 Создание/изменение/удаление событий — только Admin (без токена 401, обычный пользователь 403).  
@@ -64,19 +64,23 @@ Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
 
 ## JWT
 
-Настройки в `WebApp/appsettings.json`, секция `Jwt`:
+В `WebApp/appsettings.json` секция `Jwt` (Secret — плейсхолдер):
 
 ```json
 "Jwt": {
-  "Secret": "MySecretKey_sprint-8_JWT_token!!",
+  "Secret": "CHANGE_ME_use_user_secrets_min_32_chars!!",
   "Issuer": "WebApp",
   "Audience": "WebApp",
   "ExpirationMinutes": 60
 }
 ```
 
-Секрет должен быть не короче 32 символов.  
-В учебном проекте он лежит в конфиге. В реальном проекте лучше вынести в переменные окружения или User Secrets и не светить в git.
+Секрет должен быть не короче 32 байт (UTF-8); при более коротком приложении не стартует.  
+Локально задайте свой ключ через User Secrets (не коммитьте в git):
+
+```
+dotnet user-secrets set "Jwt:Secret" "ваш_секрет_не_короче_32_символов!!" --project WebApp/WebApp.csproj
+```
 
 ### Как получить токен в Swagger
 
@@ -157,7 +161,8 @@ Auth (без токена):
 
 ## Фон и синхронизация
 
-`BookingBackgroundService` берёт Pending-брони, ждёт пару секунд и ставит Confirmed или Rejected (с возвратом места).  
+`BookingBackgroundService` берёт Pending-брони, ждёт пару секунд и в нормальном пути ставит Confirmed.  
+Rejected и возврат места — в `catch` при ошибке обработки; если события уже нет — Reject без `ReleaseSeats`.  
 В `BookingService` для создания брони используется static `SemaphoreSlim` (вместо `lock`, потому что внутри есть `await`).
 
 ## Ошибки

@@ -36,6 +36,7 @@ public class AuthorizationTests : IClassFixture<CustomWebApplicationFactory>
             new StringContent(json, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
@@ -44,6 +45,7 @@ public class AuthorizationTests : IClassFixture<CustomWebApplicationFactory>
         var client = _factory.CreateClient();
         var response = await client.PostAsync($"/events/{Guid.NewGuid()}/book", null);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
@@ -76,6 +78,40 @@ public class AuthorizationTests : IClassFixture<CustomWebApplicationFactory>
 
         var cancelResponse = await other.DeleteAsync($"/bookings/{bookingId}");
         Assert.Equal(HttpStatusCode.Forbidden, cancelResponse.StatusCode);
+        Assert.Equal("application/problem+json", cancelResponse.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Get_OtherUsersBooking_AsUser_ReturnsForbidden()
+    {
+        var admin = await _factory.CreateAuthenticatedClientAsync($"admin_get_{Guid.NewGuid():N}", "Admin");
+        var owner = await _factory.CreateAuthenticatedClientAsync($"owner_get_{Guid.NewGuid():N}", "User");
+        var other = await _factory.CreateAuthenticatedClientAsync($"other_get_{Guid.NewGuid():N}", "User");
+
+        var start = DateTime.UtcNow.AddDays(22);
+        var createJson = $$"""
+            {
+              "title": "Событие Get",
+              "startAt": "{{start:O}}",
+              "endAt": "{{start.AddHours(2):O}}",
+              "totalSeats": 5
+            }
+            """;
+        var createResponse = await admin.PostAsync(
+            "/events",
+            new StringContent(createJson, Encoding.UTF8, "application/json"));
+        createResponse.EnsureSuccessStatusCode();
+        var eventId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        var bookResponse = await owner.PostAsync($"/events/{eventId}/book", null);
+        bookResponse.EnsureSuccessStatusCode();
+        var bookingId = (await bookResponse.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        var getResponse = await other.GetAsync($"/bookings/{bookingId}");
+        Assert.Equal(HttpStatusCode.Forbidden, getResponse.StatusCode);
+        Assert.Equal("application/problem+json", getResponse.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]

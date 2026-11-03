@@ -25,6 +25,12 @@ internal sealed class JwtTokenService : IJwtTokenService
     {
         _secret = configuration["Jwt:Secret"]
             ?? throw new InvalidOperationException("В конфигурации не задан Jwt:Secret");
+        if (Encoding.UTF8.GetByteCount(_secret) < 32)
+        {
+            throw new InvalidOperationException(
+                "Jwt:Secret должен быть не короче 32 байт (UTF-8). Задайте секрет через User Secrets или переменные окружения.");
+        }
+
         _issuer = configuration["Jwt:Issuer"]
             ?? throw new InvalidOperationException("В конфигурации не задан Jwt:Issuer");
         _audience = configuration["Jwt:Audience"]

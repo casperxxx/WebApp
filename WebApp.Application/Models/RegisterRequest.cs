@@ -12,6 +12,7 @@ public class RegisterRequest
     /// Логин
     /// </summary>
     [Required(ErrorMessage = "Требуется логин")]
+    [MaxLength(100, ErrorMessage = "Логин не должен быть длиннее 100 символов")]
     public string Login { get; set; } = string.Empty;
 
     /// <summary>

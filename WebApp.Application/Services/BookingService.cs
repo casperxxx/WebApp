@@ -78,14 +78,19 @@ internal class BookingService : IBookingService
     }
 
     /// <summary>
-    /// Возвращает бронь по Id
+    /// Возвращает бронь по Id; чужую бронь может смотреть только Admin
     /// </summary>
-    public async Task<BookingResponse> GetBookingByIdAsync(Guid bookingId)
+    public async Task<BookingResponse> GetBookingByIdAsync(Guid bookingId, Guid currentUserId, bool isAdmin)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId);
         if (booking is null)
         {
             throw new NotFoundException($"Бронь с id {bookingId} не найдена");
+        }
+
+        if (booking.UserId != currentUserId && !isAdmin)
+        {
+            throw new ForbiddenException("Недостаточно прав для просмотра этой брони");
         }
 
         return BookingResponse.From(booking);

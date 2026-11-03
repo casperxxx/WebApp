@@ -71,6 +71,26 @@ public class ErrorResponseTests : IClassFixture<CustomWebApplicationFactory>
             new StringContent(json, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(401, body.GetProperty("status").GetInt32());
+        Assert.True(body.TryGetProperty("traceId", out _));
+    }
+
+    [Fact]
+    public async Task Register_LoginLongerThan100_ReturnsProblemJson()
+    {
+        var request = new RegisterRequest
+        {
+            Login = new string('a', 101),
+            Password = "password"
+        };
+
+        var response = await _client.PostAsJsonAsync("/auth/register", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
@@ -138,6 +158,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Testing: без User Secrets, общий Jwt:Secret из appsettings.json
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
