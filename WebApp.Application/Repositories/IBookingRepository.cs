@@ -21,4 +21,9 @@ public interface IBookingRepository
     /// Добавить бронь в контекст (без SaveChanges)
     /// </summary>
     Task AddAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Число активных броней пользователя (Pending и Confirmed)
+    /// </summary>
+    Task<int> CountActiveByUserAsync(Guid userId, CancellationToken cancellationToken = default);
 }

@@ -41,9 +41,14 @@ namespace WebApp.Infrastructure.DataAccess.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EventId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("bookings", (string)null);
                 });
@@ -79,6 +84,34 @@ namespace WebApp.Infrastructure.DataAccess.Migrations
                     b.ToTable("events", (string)null);
                 });
 
+            modelBuilder.Entity("WebApp.Domain.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Login")
+                        .IsUnique();
+
+                    b.ToTable("users", (string)null);
+                });
+
             modelBuilder.Entity("WebApp.Domain.Entities.Booking", b =>
                 {
                     b.HasOne("WebApp.Domain.Entities.Event", "Event")
@@ -87,10 +120,23 @@ namespace WebApp.Infrastructure.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApp.Domain.Entities.User", "User")
+                        .WithMany("Bookings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Event");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WebApp.Domain.Entities.Event", b =>
+                {
+                    b.Navigation("Bookings");
+                });
+
+            modelBuilder.Entity("WebApp.Domain.Entities.User", b =>
                 {
                     b.Navigation("Bookings");
                 });
@@ -98,4 +144,3 @@ namespace WebApp.Infrastructure.DataAccess.Migrations
         }
     }
 }
-

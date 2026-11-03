@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WebApp.Application.Repositories;
+using WebApp.Application.Security;
 using WebApp.Infrastructure.DataAccess;
 using WebApp.Infrastructure.Repositories;
+using WebApp.Infrastructure.Security;
 
 namespace WebApp.Infrastructure;
 
@@ -13,7 +15,7 @@ namespace WebApp.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет DbContext, PostgreSQL и реализации репозиториев
+    /// Добавляет DbContext, PostgreSQL, репозитории и компоненты безопасности
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -24,7 +26,12 @@ public static class DependencyInjection
 
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // хеш паролей и выдача JWT (параметры из секции Jwt)
+        services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         return services;
     }

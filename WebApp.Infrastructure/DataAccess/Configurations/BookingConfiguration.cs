@@ -14,6 +14,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.Id).ValueGeneratedNever();
 
         builder.Property(b => b.EventId).IsRequired();
+        builder.Property(b => b.UserId).IsRequired();
 
         builder.Property(b => b.Status)
             .IsRequired()
@@ -27,5 +28,10 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .WithMany(e => e.Bookings)
             .HasForeignKey(b => b.EventId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(b => b.User)
+            .WithMany(u => u.Bookings)
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
