@@ -1,4 +1,6 @@
+using WebApp.Application.Repositories;
 using WebApp.Domain.Entities;
+using WebApp.Infrastructure.DataAccess;
 
 namespace EventApi.IntegrationTests;
 
@@ -16,7 +18,18 @@ public class BookingRepositoryTests
         new(year, month, day, hour, 0, 0, DateTimeKind.Utc);
 
     private static Event CreateEvent(string title = "Тест", int seats = 10) =>
-        Event.Create(title, null, Utc(2026, 8, 10), Utc(2026, 8, 10, 12), seats);
+        Event.Create(title, null, Utc(2027, 8, 10), Utc(2027, 8, 10, 12), seats);
+
+    /// <summary>
+    /// Пользователь нужен из‑за FK bookings → users
+    /// </summary>
+    private static async Task<User> AddUserAsync(AppDbContext context, IUnitOfWork unitOfWork)
+    {
+        var user = User.Create($"user_{Guid.NewGuid():N}", "HASH", UserRole.User);
+        context.Users.Add(user);
+        await unitOfWork.SaveChangesAsync();
+        return user;
+    }
 
     [Fact]
     public async Task AddAsync_And_GetByIdAsync_ReturnsPendingBooking()
@@ -25,11 +38,12 @@ public class BookingRepositoryTests
         var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
+            var user = await AddUserAsync(context, unitOfWork);
             var eventItem = CreateEvent();
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var booking = Booking.CreatePending(eventItem.Id);
+            var booking = Booking.CreatePending(eventItem.Id, user.Id);
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -38,6 +52,7 @@ public class BookingRepositoryTests
             Assert.NotNull(loaded);
             Assert.Equal(booking.Id, loaded.Id);
             Assert.Equal(eventItem.Id, loaded.EventId);
+            Assert.Equal(user.Id, loaded.UserId);
             Assert.Equal(BookingStatus.Pending, loaded.Status);
         }
     }
@@ -49,6 +64,7 @@ public class BookingRepositoryTests
         var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
+            var user = await AddUserAsync(context, unitOfWork);
             var eventItem = CreateEvent(seats: 3);
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
@@ -56,7 +72,7 @@ public class BookingRepositoryTests
             var tracked = await events.GetByIdAsync(eventItem.Id);
             Assert.True(tracked!.TryReserveSeats());
 
-            var booking = Booking.CreatePending(tracked.Id);
+            var booking = Booking.CreatePending(tracked.Id, user.Id);
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -88,13 +104,14 @@ public class BookingRepositoryTests
         var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
+            var user = await AddUserAsync(context, unitOfWork);
             var eventItem = CreateEvent(seats: 5);
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var pending1 = Booking.CreatePending(eventItem.Id);
-            var pending2 = Booking.CreatePending(eventItem.Id);
-            var confirmed = Booking.CreatePending(eventItem.Id);
+            var pending1 = Booking.CreatePending(eventItem.Id, user.Id);
+            var pending2 = Booking.CreatePending(eventItem.Id, user.Id);
+            var confirmed = Booking.CreatePending(eventItem.Id, user.Id);
             await bookings.AddAsync(pending1);
             await bookings.AddAsync(pending2);
             await bookings.AddAsync(confirmed);
@@ -119,11 +136,12 @@ public class BookingRepositoryTests
         var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
+            var user = await AddUserAsync(context, unitOfWork);
             var eventItem = CreateEvent();
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
-            var booking = Booking.CreatePending(eventItem.Id);
+            var booking = Booking.CreatePending(eventItem.Id, user.Id);
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -143,13 +161,14 @@ public class BookingRepositoryTests
         var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
         await using (context)
         {
+            var user = await AddUserAsync(context, unitOfWork);
             var eventItem = CreateEvent(seats: 1);
             await events.AddAsync(eventItem);
             await unitOfWork.SaveChangesAsync();
 
             var tracked = await events.GetByIdAsync(eventItem.Id);
             tracked!.TryReserveSeats();
-            var booking = Booking.CreatePending(tracked.Id);
+            var booking = Booking.CreatePending(tracked.Id, user.Id);
             await bookings.AddAsync(booking);
             await unitOfWork.SaveChangesAsync();
 
@@ -162,6 +181,38 @@ public class BookingRepositoryTests
 
             Assert.Equal(BookingStatus.Rejected, loadedBooking!.Status);
             Assert.Equal(1, loadedEvent!.AvailableSeats);
+        }
+    }
+
+    [Fact]
+    public async Task CountActiveByUserAsync_CountsPendingAndConfirmedOnly()
+    {
+        await _fixture.ResetDatabaseAsync();
+        var (events, bookings, unitOfWork, context) = _fixture.CreateRepositories();
+        await using (context)
+        {
+            var user = await AddUserAsync(context, unitOfWork);
+            var other = await AddUserAsync(context, unitOfWork);
+            var eventItem = CreateEvent(seats: 10);
+            await events.AddAsync(eventItem);
+            await unitOfWork.SaveChangesAsync();
+
+            var pending = Booking.CreatePending(eventItem.Id, user.Id);
+            var confirmed = Booking.CreatePending(eventItem.Id, user.Id);
+            var rejected = Booking.CreatePending(eventItem.Id, user.Id);
+            var otherUserBooking = Booking.CreatePending(eventItem.Id, other.Id);
+            await bookings.AddAsync(pending);
+            await bookings.AddAsync(confirmed);
+            await bookings.AddAsync(rejected);
+            await bookings.AddAsync(otherUserBooking);
+            await unitOfWork.SaveChangesAsync();
+
+            confirmed.Confirm();
+            rejected.Reject();
+            await unitOfWork.SaveChangesAsync();
+
+            Assert.Equal(2, await bookings.CountActiveByUserAsync(user.Id));
+            Assert.Equal(1, await bookings.CountActiveByUserAsync(other.Id));
         }
     }
 }
