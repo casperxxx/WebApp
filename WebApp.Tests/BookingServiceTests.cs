@@ -159,11 +159,36 @@ public class BookingServiceTests : IDisposable
         var eventItem = await CreateTestEventAsync(scope);
         var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
 
-        var booking = await bookingService.GetBookingByIdAsync(created.Id);
+        var booking = await bookingService.GetBookingByIdAsync(created.Id, _userId, isAdmin: false);
 
         Assert.Equal(created.Id, booking.Id);
         Assert.Equal(eventItem.Id, booking.EventId);
         Assert.Equal(BookingStatus.Pending, booking.Status);
+    }
+
+    [Fact]
+    public async Task GetBookingById_OtherUser_ThrowsForbidden()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventItem = await CreateTestEventAsync(scope);
+        var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+
+        await Assert.ThrowsAsync<ForbiddenException>(
+            () => bookingService.GetBookingByIdAsync(created.Id, Guid.NewGuid(), isAdmin: false));
+    }
+
+    [Fact]
+    public async Task GetBookingById_Admin_CanViewOthersBooking()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventItem = await CreateTestEventAsync(scope);
+        var created = await bookingService.CreateBookingAsync(eventItem.Id, _userId);
+
+        var booking = await bookingService.GetBookingByIdAsync(created.Id, Guid.NewGuid(), isAdmin: true);
+
+        Assert.Equal(created.Id, booking.Id);
     }
 
     [Fact]
@@ -275,7 +300,7 @@ public class BookingServiceTests : IDisposable
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => bookingService.GetBookingByIdAsync(Guid.NewGuid()));
+            () => bookingService.GetBookingByIdAsync(Guid.NewGuid(), _userId, isAdmin: false));
     }
 
     [Fact]

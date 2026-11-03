@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WebApp.Domain.Entities;
 using WebApp.Infrastructure.DataAccess;
 using WebApp.Infrastructure.Repositories;
@@ -18,7 +20,7 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task AddAsync_DuplicateLogin_ThrowsOnSave()
+    public async Task AddAsync_DuplicateLogin_ThrowsUniqueViolation()
     {
         await _fixture.ResetDatabaseAsync();
         var context = _fixture.CreateDbContext();
@@ -32,7 +34,9 @@ public class UserRepositoryTests
 
             await users.AddAsync(User.Create("same_login", "HASH2", UserRole.Admin));
 
-            await Assert.ThrowsAnyAsync<Exception>(() => unitOfWork.SaveChangesAsync());
+            var ex = await Assert.ThrowsAsync<DbUpdateException>(() => unitOfWork.SaveChangesAsync());
+            var postgres = Assert.IsType<PostgresException>(ex.InnerException);
+            Assert.Equal(PostgresErrorCodes.UniqueViolation, postgres.SqlState);
         }
     }
 

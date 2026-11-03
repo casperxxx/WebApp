@@ -25,19 +25,21 @@ public class BookingsController : ControllerBase
     }
 
     /// <summary>
-    /// Получить бронь по Id
+    /// Получить бронь по Id (свою или любую — для Admin)
     /// </summary>
     /// <param name="id">Id брони</param>
     /// <response code="200">Бронь найдена</response>
     /// <response code="401">Нет токена</response>
+    /// <response code="403">Нет прав на просмотр чужой брони</response>
     /// <response code="404">Бронь не найдена</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {
-        return Ok(await _bookingService.GetBookingByIdAsync(id));
+        return Ok(await _bookingService.GetBookingByIdAsync(id, User.GetUserId(), User.IsAdmin()));
     }
 
     /// <summary>

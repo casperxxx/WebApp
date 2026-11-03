@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using WebApp.Application;
 using WebApp.Infrastructure;
 using WebApp.Middleware;
+using WebApp.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,9 +39,15 @@ builder.Services.AddControllers()
 
 builder.Services.AddProblemDetails();
 
-// JWT: параметры из секции Jwt в appsettings.json
+// JWT: параметры из секции Jwt (appsettings / User Secrets)
 var jwtSecret = builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException("В конфигурации не задан Jwt:Secret");
+if (Encoding.UTF8.GetByteCount(jwtSecret) < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret должен быть не короче 32 байт (UTF-8). Задайте секрет через User Secrets или переменные окружения.");
+}
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]
     ?? throw new InvalidOperationException("В конфигурации не задан Jwt:Issuer");
 var jwtAudience = builder.Configuration["Jwt:Audience"]
@@ -61,6 +68,49 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             RoleClaimType = System.Security.Claims.ClaimTypes.Role,
             NameClaimType = System.Security.Claims.ClaimTypes.Name
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+                var problemDetails = new ProblemDetails
+                {
+                    Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "Не авторизован",
+                    Detail = "Требуется аутентификация",
+                    Instance = context.Request.Path
+                };
+                problemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+
+                await context.Response.WriteAsJsonAsync(
+                    problemDetails,
+                    options: null,
+                    contentType: "application/problem+json");
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+                var problemDetails = new ProblemDetails
+                {
+                    Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4",
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Доступ запрещён",
+                    Detail = "Недостаточно прав для выполнения операции",
+                    Instance = context.Request.Path
+                };
+                problemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+
+                await context.Response.WriteAsJsonAsync(
+                    problemDetails,
+                    options: null,
+                    contentType: "application/problem+json");
+            }
         };
     });
 
@@ -87,20 +137,8 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT"
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+    // Bearer только на [Authorize], не на весь документ
+    options.OperationFilter<AuthorizeCheckOperationFilter>();
 
     var presentationXml = Path.Combine(AppContext.BaseDirectory, "WebApp.xml");
     if (File.Exists(presentationXml))

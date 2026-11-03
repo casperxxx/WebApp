@@ -71,12 +71,17 @@ public class ExceptionHandlingMiddleware
             type = "https://tools.ietf.org/html/rfc9110#section-15.5.1";
         }
 
+        // для 5xx не отдаём текст исключения наружу
+        var detail = statusCode >= 500
+            ? "Произошла внутренняя ошибка"
+            : exception.Message;
+
         var problemDetails = new ProblemDetails
         {
             Type = type,
             Status = statusCode,
             Title = title,
-            Detail = exception.Message,
+            Detail = detail,
             Instance = context.Request.Path
         };
 
