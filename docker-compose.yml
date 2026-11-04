@@ -1,9 +1,9 @@
-# PostgreSQL для EventApi — совпадает с ConnectionStrings:DefaultConnection в appsettings.json
-# Запуск из корня репозитория: docker compose up -d
+# Инфраструктура для локальной разработки.
+# Запуск: docker compose up -d
 # Остановка: docker compose down
-# Данные сохраняются в именованном томе eventapi_pgdata
 
 services:
+  # монолит sprint-8 (пока оставляем)
   postgres:
     image: postgres:16-alpine
     container_name: eventapi-postgres
@@ -22,5 +22,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # БД сервиса Users (sprint-9)
+  postgres-users:
+    image: postgres:16-alpine
+    container_name: users-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - users_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   eventapi_pgdata:
+  users_pgdata:
