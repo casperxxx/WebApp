@@ -1,0 +1,83 @@
+using System.ComponentModel.DataAnnotations;
+using System.Net;
+using Microsoft.AspNetCore.Mvc;
+using Events.Domain.Exceptions;
+
+namespace Events.Api.Middleware;
+
+/// <summary>
+/// Middleware для глобальной обработки ошибок
+/// </summary>
+public class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    /// <summary>
+    /// Создаёт middleware обработки ошибок
+    /// </summary>
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Перехватывает исключения и отдаёт ProblemDetails
+    /// </summary>
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке запроса");
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+
+    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    {
+        var statusCode = (int)HttpStatusCode.InternalServerError;
+        var title = "Внутренняя ошибка сервера";
+        var type = "https://tools.ietf.org/html/rfc9110#section-15.6.1";
+
+        if (exception is NotFoundException)
+        {
+            statusCode = (int)HttpStatusCode.NotFound;
+            title = "Не найдено";
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.5";
+        }
+        else if (exception is DomainValidationException or ValidationException)
+        {
+            statusCode = (int)HttpStatusCode.BadRequest;
+            title = "Некорректный запрос";
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.1";
+        }
+
+        // для 5xx не отдаём текст исключения наружу
+        var detail = statusCode >= 500
+            ? "Произошла внутренняя ошибка"
+            : exception.Message;
+
+        var problemDetails = new ProblemDetails
+        {
+            Type = type,
+            Status = statusCode,
+            Title = title,
+            Detail = detail,
+            Instance = context.Request.Path
+        };
+
+        problemDetails.Extensions["traceId"] = context.TraceIdentifier;
+
+        context.Response.StatusCode = statusCode;
+
+        await context.Response.WriteAsJsonAsync(
+            problemDetails,
+            options: null,
+            contentType: "application/problem+json");
+    }
+}
