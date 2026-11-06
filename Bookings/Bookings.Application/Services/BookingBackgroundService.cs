@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Bookings.Application.Messaging;
 using Bookings.Application.Repositories;
 using Bookings.Domain.Entities;
+using Shared.Contracts;
 
 namespace Bookings.Application.Services;
 
@@ -15,13 +17,16 @@ public class BookingBackgroundService : BackgroundService
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(1);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBookingConfirmedPublisher _publisher;
     private readonly ILogger<BookingBackgroundService> _logger;
 
     public BookingBackgroundService(
         IServiceScopeFactory scopeFactory,
+        IBookingConfirmedPublisher publisher,
         ILogger<BookingBackgroundService> logger)
     {
         _scopeFactory = scopeFactory;
+        _publisher = publisher;
         _logger = logger;
     }
 
@@ -71,9 +76,20 @@ public class BookingBackgroundService : BackgroundService
                 return;
             }
 
-            // сначала сохраняем Confirmed; публикация в Kafka — на этапе 6
+            // сначала сохраняем Confirmed, потом публикуем в Kafka
             booking.Confirm();
             await unitOfWork.SaveChangesAsync(stoppingToken);
+
+            var confirmedAt = booking.ProcessedAt ?? DateTime.UtcNow;
+            await _publisher.PublishAsync(
+                new BookingConfirmed(
+                    booking.Id,
+                    booking.EventId,
+                    booking.UserId,
+                    Seats: 1,
+                    confirmedAt),
+                stoppingToken);
+
             _logger.LogInformation("Бронь {BookingId} обработана, статус Confirmed", booking.Id);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

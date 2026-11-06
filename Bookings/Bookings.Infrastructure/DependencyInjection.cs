@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Bookings.Application.Messaging;
 using Bookings.Application.Repositories;
 using Bookings.Infrastructure.DataAccess;
+using Bookings.Infrastructure.Messaging;
 using Bookings.Infrastructure.Repositories;
 
 namespace Bookings.Infrastructure;
@@ -13,7 +15,7 @@ namespace Bookings.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет DbContext, PostgreSQL и репозитории Bookings
+    /// Добавляет DbContext, PostgreSQL, репозитории и Kafka-продюсер
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -24,6 +26,9 @@ public static class DependencyInjection
 
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // продюсер один на приложение, при остановке Dispose
+        services.AddSingleton<IBookingConfirmedPublisher, KafkaBookingConfirmedPublisher>();
 
         return services;
     }
