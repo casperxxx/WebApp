@@ -4,7 +4,7 @@ using Events.Domain.Entities;
 namespace Events.Infrastructure.DataAccess;
 
 /// <summary>
-/// DbContext сервиса Events (только таблица events)
+/// DbContext сервиса Events (events + processed_bookings + processed_cancellations)
 /// </summary>
 public sealed class EventsDbContext : DbContext
 {
@@ -13,6 +13,11 @@ public sealed class EventsDbContext : DbContext
     }
 
     public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<ProcessedBooking> ProcessedBookings => Set<ProcessedBooking>();
+
+    public DbSet<ProcessedCancellation> ProcessedCancellations => Set<ProcessedCancellation>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
