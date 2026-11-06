@@ -1,7 +1,9 @@
+using Bookings.Application.Messaging;
 using Bookings.Application.Models;
 using Bookings.Application.Repositories;
 using Bookings.Domain.Entities;
 using Bookings.Domain.Exceptions;
+using Shared.Contracts;
 
 namespace Bookings.Application.Services;
 
@@ -19,17 +21,20 @@ internal class BookingService : IBookingService
 
     private readonly IBookingRepository _bookingRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IBookingCancelledPublisher _cancelledPublisher;
 
     public BookingService(
         IBookingRepository bookingRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IBookingCancelledPublisher cancelledPublisher)
     {
         _bookingRepository = bookingRepository;
         _unitOfWork = unitOfWork;
+        _cancelledPublisher = cancelledPublisher;
     }
 
     /// <summary>
-    /// Создаёт бронь в статусе Pending; места уменьшает Events по Kafka (этап 6–7)
+    /// Создаёт бронь в статусе Pending; места уменьшает Events по Kafka
     /// </summary>
     public async Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId)
     {
@@ -75,7 +80,8 @@ internal class BookingService : IBookingService
     }
 
     /// <summary>
-    /// Отменяет бронь: владелец или администратор
+    /// Отменяет бронь: владелец или администратор.
+    /// Если бронь была Confirmed — шлём BookingCancelled, чтобы Events вернул места.
     /// </summary>
     public async Task CancelBookingAsync(Guid bookingId, Guid currentUserId, bool isAdmin)
     {
@@ -93,8 +99,24 @@ internal class BookingService : IBookingService
                 throw new ForbiddenException("Недостаточно прав для отмены этой брони");
             }
 
+            var wasConfirmed = booking.Status == BookingStatus.Confirmed;
+            var eventId = booking.EventId;
+            var userId = booking.UserId;
+
             booking.Cancel();
             await _unitOfWork.SaveChangesAsync();
+
+            // Pending ещё не списывал места — Kafka не нужна
+            if (wasConfirmed)
+            {
+                await _cancelledPublisher.PublishAsync(
+                    new BookingCancelled(
+                        booking.Id,
+                        eventId,
+                        userId,
+                        Seats: 1,
+                        DateTime.UtcNow));
+            }
         }
         finally
         {

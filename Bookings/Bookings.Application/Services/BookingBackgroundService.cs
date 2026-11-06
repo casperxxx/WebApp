@@ -76,11 +76,10 @@ public class BookingBackgroundService : BackgroundService
                 return;
             }
 
-            // сначала сохраняем Confirmed, потом публикуем в Kafka
-            booking.Confirm();
-            await unitOfWork.SaveChangesAsync(stoppingToken);
-
-            var confirmedAt = booking.ProcessedAt ?? DateTime.UtcNow;
+            // сначала Kafka, потом Confirm в БД:
+            // если publish упал — остаёмся Pending и повторим на следующем цикле;
+            // если publish прошёл, а Confirm нет — Events идемпотентен по BookingId
+            var confirmedAt = DateTime.UtcNow;
             await _publisher.PublishAsync(
                 new BookingConfirmed(
                     booking.Id,
@@ -89,6 +88,9 @@ public class BookingBackgroundService : BackgroundService
                     Seats: 1,
                     confirmedAt),
                 stoppingToken);
+
+            booking.Confirm();
+            await unitOfWork.SaveChangesAsync(stoppingToken);
 
             _logger.LogInformation("Бронь {BookingId} обработана, статус Confirmed", booking.Id);
         }

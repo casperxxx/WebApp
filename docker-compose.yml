@@ -1,5 +1,5 @@
-# Инфраструктура для локальной разработки.
-# Запуск: docker compose up -d
+# Инфраструктура + API сервисов sprint-9.
+# Запуск: docker compose up -d --build
 # Остановка: docker compose down
 
 services:
@@ -30,27 +30,16 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-
-  # монолит sprint-8 (пока оставляем)
-  postgres:
-    image: postgres:16-alpine
-    container_name: eventapi-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: eventapi
-    ports:
-      - "5433:5432"
-    volumes:
-      - eventapi_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d eventapi"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
 
-  # БД сервиса Users (sprint-9)
+
+  # БД сервиса Users
+
   postgres-users:
     image: postgres:16-alpine
     container_name: users-postgres
@@ -69,7 +58,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # БД сервиса Events (sprint-9)
+  # БД сервиса Events
   postgres-events:
     image: postgres:16-alpine
     container_name: events-postgres
@@ -88,7 +77,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # БД сервиса Bookings (sprint-9)
+  # БД сервиса Bookings
   postgres-bookings:
     image: postgres:16-alpine
     container_name: bookings-postgres
@@ -107,8 +96,77 @@ services:
       timeout: 5s
       retries: 5
 
+  # API Users — http://localhost:5101
+  users-api:
+    build:
+      context: .
+      dockerfile: Users/Users.Api/Dockerfile
+    container_name: users-api
+    restart: unless-stopped
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    ports:
+      - "5101:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres-users;Port=5432;Database=users_db;Username=postgres;Password=postgres
+      Jwt__Secret: CHANGE_ME_use_user_secrets_min_32_chars!!
+      Jwt__Issuer: WebApp
+      Jwt__Audience: WebApp
+      Jwt__ExpirationMinutes: "60"
+
+  # API Events — http://localhost:5102
+  events-api:
+    build:
+      context: .
+      dockerfile: Events/Events.Api/Dockerfile
+    container_name: events-api
+    restart: unless-stopped
+    depends_on:
+      postgres-events:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5102:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres-events;Port=5432;Database=events_db;Username=postgres;Password=postgres
+      Jwt__Secret: CHANGE_ME_use_user_secrets_min_32_chars!!
+      Jwt__Issuer: WebApp
+      Jwt__Audience: WebApp
+      Jwt__ExpirationMinutes: "60"
+      Kafka__BootstrapServers: kafka:29092
+      Kafka__ConsumerGroup: events-service
+      Kafka__CancellationConsumerGroup: events-service-cancellations
+
+  # API Bookings — http://localhost:5103
+  bookings-api:
+    build:
+      context: .
+      dockerfile: Bookings/Bookings.Api/Dockerfile
+    container_name: bookings-api
+    restart: unless-stopped
+    depends_on:
+      postgres-bookings:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5103:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres-bookings;Port=5432;Database=bookings_db;Username=postgres;Password=postgres
+      Jwt__Secret: CHANGE_ME_use_user_secrets_min_32_chars!!
+      Jwt__Issuer: WebApp
+      Jwt__Audience: WebApp
+      Jwt__ExpirationMinutes: "60"
+      Kafka__BootstrapServers: kafka:29092
+
 volumes:
-  eventapi_pgdata:
   users_pgdata:
   events_pgdata:
   bookings_pgdata:

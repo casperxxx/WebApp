@@ -27,8 +27,9 @@ public static class DependencyInjection
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        // продюсер один на приложение, при остановке Dispose
+        // продюсеры один на приложение, при остановке Dispose
         services.AddSingleton<IBookingConfirmedPublisher, KafkaBookingConfirmedPublisher>();
+        services.AddSingleton<IBookingCancelledPublisher, KafkaBookingCancelledPublisher>();
 
         return services;
     }
