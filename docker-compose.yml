@@ -60,7 +60,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # БД сервиса Bookings (sprint-9)
+  postgres-bookings:
+    image: postgres:16-alpine
+    container_name: bookings-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookings_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - bookings_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bookings_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   eventapi_pgdata:
   users_pgdata:
   events_pgdata:
+  bookings_pgdata:
