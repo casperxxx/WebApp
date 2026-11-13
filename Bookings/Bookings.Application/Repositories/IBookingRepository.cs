@@ -1,0 +1,29 @@
+using Bookings.Domain.Entities;
+
+namespace Bookings.Application.Repositories;
+
+/// <summary>
+/// Репозиторий для работы с бронированиями в БД
+/// </summary>
+public interface IBookingRepository
+{
+    /// <summary>
+    /// Найти бронь по Id
+    /// </summary>
+    Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Id всех броней в статусе Pending (для фонового сервиса)
+    /// </summary>
+    Task<List<Guid>> GetPendingIdsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Добавить бронь в контекст (без SaveChanges)
+    /// </summary>
+    Task AddAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Число активных броней пользователя (Pending и Confirmed)
+    /// </summary>
+    Task<int> CountActiveByUserAsync(Guid userId, CancellationToken cancellationToken = default);
+}
