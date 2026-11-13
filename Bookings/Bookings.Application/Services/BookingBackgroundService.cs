@@ -1,15 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Bookings.Application.Messaging;
 using Bookings.Application.Repositories;
 using Bookings.Domain.Entities;
-using Shared.Contracts;
 
 namespace Bookings.Application.Services;
 
 /// <summary>
-/// Фоновая обработка броней: Pending -> Confirmed / Rejected
+/// Фоновая обработка броней: Pending -> Confirmed (+ outbox) / Rejected
 /// </summary>
 public class BookingBackgroundService : BackgroundService
 {
@@ -17,16 +15,13 @@ public class BookingBackgroundService : BackgroundService
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(1);
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IBookingConfirmedPublisher _publisher;
     private readonly ILogger<BookingBackgroundService> _logger;
 
     public BookingBackgroundService(
         IServiceScopeFactory scopeFactory,
-        IBookingConfirmedPublisher publisher,
         ILogger<BookingBackgroundService> logger)
     {
         _scopeFactory = scopeFactory;
-        _publisher = publisher;
         _logger = logger;
     }
 
@@ -37,7 +32,6 @@ public class BookingBackgroundService : BackgroundService
             try
             {
                 List<Guid> pendingIds;
-                // scope нужен, потому что репозиторий (и DbContext) — scoped, а фон — singleton
                 using (var scope = _scopeFactory.CreateScope())
                 {
                     var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
@@ -68,6 +62,7 @@ public class BookingBackgroundService : BackgroundService
 
             using var scope = _scopeFactory.CreateScope();
             var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
             var booking = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
@@ -76,23 +71,14 @@ public class BookingBackgroundService : BackgroundService
                 return;
             }
 
-            // сначала Kafka, потом Confirm в БД:
-            // если publish упал — остаёмся Pending и повторим на следующем цикле;
-            // если publish прошёл, а Confirm нет — Events идемпотентен по BookingId
-            var confirmedAt = DateTime.UtcNow;
-            await _publisher.PublishAsync(
-                new BookingConfirmed(
-                    booking.Id,
-                    booking.EventId,
-                    booking.UserId,
-                    Seats: 1,
-                    confirmedAt),
-                stoppingToken);
-
+            // Confirm + outbox в одной транзакции — Kafka отправит OutboxPublisher
             booking.Confirm();
+            await outboxRepository.AddAsync(
+                OutboxHelper.CreateConfirmed(booking, booking.ProcessedAt ?? DateTime.UtcNow),
+                stoppingToken);
             await unitOfWork.SaveChangesAsync(stoppingToken);
 
-            _logger.LogInformation("Бронь {BookingId} обработана, статус Confirmed", booking.Id);
+            _logger.LogInformation("Бронь {BookingId} подтверждена, сообщение в outbox", booking.Id);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

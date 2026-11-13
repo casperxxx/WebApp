@@ -8,16 +8,10 @@ using Shared.Contracts;
 namespace Events.Infrastructure.Messaging;
 
 /// <summary>
-/// При старте создаёт топики booking-confirmed и booking-cancelled, если их ещё нет
+/// При старте создаёт топик booking-events, если его ещё нет
 /// </summary>
 internal sealed class KafkaTopicInitializer : IHostedService
 {
-    private static readonly string[] Topics =
-    [
-        KafkaTopics.BookingConfirmed,
-        KafkaTopics.BookingCancelled
-    ];
-
     private readonly IConfiguration _configuration;
     private readonly ILogger<KafkaTopicInitializer> _logger;
 
@@ -31,19 +25,18 @@ internal sealed class KafkaTopicInitializer : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // не ждём Kafka в StartAsync — иначе HTTP не поднимется, пока брокер спит
-        _ = Task.Run(() => EnsureTopicsAsync(cancellationToken), CancellationToken.None);
+        _ = Task.Run(() => EnsureTopicAsync(cancellationToken), CancellationToken.None);
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task EnsureTopicsAsync(CancellationToken cancellationToken)
+    private async Task EnsureTopicAsync(CancellationToken cancellationToken)
     {
         var bootstrapServers = _configuration["Kafka:BootstrapServers"];
         if (string.IsNullOrWhiteSpace(bootstrapServers))
         {
-            _logger.LogWarning("Kafka:BootstrapServers не задан — топики не создаём");
+            _logger.LogWarning("Kafka:BootstrapServers не задан — топик не создаём");
             return;
         }
 
@@ -65,35 +58,33 @@ internal sealed class KafkaTopicInitializer : IHostedService
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(15));
 
-                var specs = Topics.Select(name => new TopicSpecification
-                {
-                    Name = name,
-                    NumPartitions = 1,
-                    ReplicationFactor = 1
-                }).ToList();
+                await admin.CreateTopicsAsync(
+                [
+                    new TopicSpecification
+                    {
+                        Name = KafkaTopics.BookingEvents,
+                        NumPartitions = 1,
+                        ReplicationFactor = 1
+                    }
+                ]).WaitAsync(cts.Token);
 
-                await admin.CreateTopicsAsync(specs).WaitAsync(cts.Token);
-
-                _logger.LogInformation("Топики созданы: {Topics}", string.Join(", ", Topics));
+                _logger.LogInformation("Топик {Topic} создан", KafkaTopics.BookingEvents);
                 return;
             }
             catch (CreateTopicsException ex) when (ex.Results.All(r =>
                 r.Error.Code == ErrorCode.TopicAlreadyExists || r.Error.Code == ErrorCode.NoError))
             {
-                _logger.LogInformation("Топики уже есть: {Topics}", string.Join(", ", Topics));
+                _logger.LogInformation("Топик {Topic} уже есть", KafkaTopics.BookingEvents);
                 return;
             }
             catch (Exception ex) when (attempt < 12)
             {
-                _logger.LogWarning(
-                    ex,
-                    "Попытка {Attempt}/12: не удалось создать топики, ждём Kafka",
-                    attempt);
+                _logger.LogWarning(ex, "Попытка {Attempt}/12 создать топик, ждём Kafka", attempt);
                 await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Не удалось создать топики Kafka");
+                _logger.LogWarning(ex, "Не удалось создать топик {Topic}", KafkaTopics.BookingEvents);
             }
         }
     }

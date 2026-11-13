@@ -18,6 +18,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 
         builder.Property(b => b.EventId).IsRequired();
         builder.Property(b => b.UserId).IsRequired();
+        builder.Property(b => b.Seats).IsRequired();
 
         // индексы по внешним Id (сами сущности Event/User живут в других сервисах)
         builder.HasIndex(b => b.EventId);

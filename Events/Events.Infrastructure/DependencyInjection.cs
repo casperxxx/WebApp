@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Events.Application.Messaging;
 using Events.Application.Repositories;
 using Events.Infrastructure.DataAccess;
 using Events.Infrastructure.Messaging;
@@ -14,7 +15,7 @@ namespace Events.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет DbContext, PostgreSQL, репозитории и Kafka consumer
+    /// Добавляет DbContext, репозитории, Kafka consumer/publisher
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -28,10 +29,9 @@ public static class DependencyInjection
         services.AddScoped<IProcessedCancellationRepository, ProcessedCancellationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        // сначала топики, потом подписчики
+        services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
         services.AddHostedService<KafkaTopicInitializer>();
-        services.AddHostedService<BookingConfirmedConsumer>();
-        services.AddHostedService<BookingCancelledConsumer>();
+        services.AddHostedService<BookingEventsConsumer>();
 
         return services;
     }

@@ -1,9 +1,7 @@
-using Bookings.Application.Messaging;
 using Bookings.Application.Models;
 using Bookings.Application.Repositories;
 using Bookings.Domain.Entities;
 using Bookings.Domain.Exceptions;
-using Shared.Contracts;
 
 namespace Bookings.Application.Services;
 
@@ -20,17 +18,17 @@ internal class BookingService : IBookingService
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
     private readonly IBookingRepository _bookingRepository;
+    private readonly IOutboxRepository _outboxRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IBookingCancelledPublisher _cancelledPublisher;
 
     public BookingService(
         IBookingRepository bookingRepository,
-        IUnitOfWork unitOfWork,
-        IBookingCancelledPublisher cancelledPublisher)
+        IOutboxRepository outboxRepository,
+        IUnitOfWork unitOfWork)
     {
         _bookingRepository = bookingRepository;
+        _outboxRepository = outboxRepository;
         _unitOfWork = unitOfWork;
-        _cancelledPublisher = cancelledPublisher;
     }
 
     /// <summary>
@@ -48,7 +46,7 @@ internal class BookingService : IBookingService
                     $"Превышен лимит активных броней ({MaxActiveBookings})");
             }
 
-            var booking = Booking.CreatePending(eventId, userId);
+            var booking = Booking.CreatePending(eventId, userId, Booking.DefaultSeats);
             await _bookingRepository.AddAsync(booking);
             await _unitOfWork.SaveChangesAsync();
 
@@ -80,8 +78,7 @@ internal class BookingService : IBookingService
     }
 
     /// <summary>
-    /// Отменяет бронь: владелец или администратор.
-    /// Если бронь была Confirmed — шлём BookingCancelled, чтобы Events вернул места.
+    /// Отменяет бронь. Если была Confirmed — outbox Cancelled в той же транзакции.
     /// </summary>
     public async Task CancelBookingAsync(Guid bookingId, Guid currentUserId, bool isAdmin)
     {
@@ -100,23 +97,16 @@ internal class BookingService : IBookingService
             }
 
             var wasConfirmed = booking.Status == BookingStatus.Confirmed;
-            var eventId = booking.EventId;
-            var userId = booking.UserId;
 
             booking.Cancel();
-            await _unitOfWork.SaveChangesAsync();
 
-            // Pending ещё не списывал места — Kafka не нужна
             if (wasConfirmed)
             {
-                await _cancelledPublisher.PublishAsync(
-                    new BookingCancelled(
-                        booking.Id,
-                        eventId,
-                        userId,
-                        Seats: 1,
-                        DateTime.UtcNow));
+                await _outboxRepository.AddAsync(
+                    OutboxHelper.CreateCancelled(booking, booking.ProcessedAt ?? DateTime.UtcNow));
             }
+
+            await _unitOfWork.SaveChangesAsync();
         }
         finally
         {

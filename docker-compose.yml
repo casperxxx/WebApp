@@ -140,7 +140,7 @@ services:
       Jwt__ExpirationMinutes: "60"
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerGroup: events-service
-      Kafka__CancellationConsumerGroup: events-service-cancellations
+
 
   # API Bookings — http://localhost:5103
   bookings-api:
@@ -165,6 +165,7 @@ services:
       Jwt__Audience: WebApp
       Jwt__ExpirationMinutes: "60"
       Kafka__BootstrapServers: kafka:29092
+      Kafka__RejectedConsumerGroup: bookings-service-rejected
 
 volumes:
   users_pgdata:

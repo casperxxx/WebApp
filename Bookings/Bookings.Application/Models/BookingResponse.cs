@@ -23,6 +23,11 @@ public class BookingResponse
     public Guid UserId { get; set; }
 
     /// <summary>
+    /// Число мест
+    /// </summary>
+    public int Seats { get; set; }
+
+    /// <summary>
     /// Статус брони
     /// </summary>
     public BookingStatus Status { get; set; }
@@ -45,6 +50,7 @@ public class BookingResponse
         Id = booking.Id,
         EventId = booking.EventId,
         UserId = booking.UserId,
+        Seats = booking.Seats,
         Status = booking.Status,
         CreatedAt = booking.CreatedAt,
         ProcessedAt = booking.ProcessedAt

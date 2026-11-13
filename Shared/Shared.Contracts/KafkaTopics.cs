@@ -6,13 +6,8 @@ namespace Shared.Contracts;
 public static class KafkaTopics
 {
     /// <summary>
-    /// Топик подтверждённых броней
+    /// Единый топик событий брони (Confirmed / Cancelled / Rejected).
+    /// Ключ сообщения = EventId — порядок для одного события сохраняется.
     /// </summary>
-    public const string BookingConfirmed = "booking-confirmed";
-
-    /// <summary>
-    /// Топик отменённых броней (возврат мест в Events)
-    /// </summary>
-    public const string BookingCancelled = "booking-cancelled";
+    public const string BookingEvents = "booking-events";
 }
-

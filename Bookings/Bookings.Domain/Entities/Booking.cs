@@ -7,6 +7,11 @@ namespace Bookings.Domain.Entities;
 /// </summary>
 public class Booking
 {
+    /// <summary>
+    /// Сколько мест занимает одна бронь (пока всегда 1)
+    /// </summary>
+    public const int DefaultSeats = 1;
+
     private Booking()
     {
     }
@@ -27,6 +32,11 @@ public class Booking
     public Guid UserId { get; private set; }
 
     /// <summary>
+    /// Сколько мест занимает бронь
+    /// </summary>
+    public int Seats { get; private set; }
+
+    /// <summary>
     /// Текущий статус брони
     /// </summary>
     public BookingStatus Status { get; private set; }
@@ -44,7 +54,7 @@ public class Booking
     /// <summary>
     /// Создаёт бронь в статусе Pending
     /// </summary>
-    public static Booking CreatePending(Guid eventId, Guid userId)
+    public static Booking CreatePending(Guid eventId, Guid userId, int seats = DefaultSeats)
     {
         if (userId == Guid.Empty)
         {
@@ -56,11 +66,17 @@ public class Booking
             throw new DomainValidationException("EventId не может быть пустым");
         }
 
+        if (seats <= 0)
+        {
+            throw new DomainValidationException("Seats должно быть больше нуля");
+        }
+
         return new Booking
         {
             Id = Guid.NewGuid(),
             EventId = eventId,
             UserId = userId,
+            Seats = seats,
             Status = BookingStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             ProcessedAt = null
@@ -72,15 +88,25 @@ public class Booking
     /// </summary>
     public void Confirm()
     {
+        if (Status != BookingStatus.Pending)
+        {
+            throw new DomainValidationException("Подтвердить можно только Pending-бронь");
+        }
+
         Status = BookingStatus.Confirmed;
         ProcessedAt = DateTime.UtcNow;
     }
 
     /// <summary>
-    /// Отклонить бронь
+    /// Отклонить бронь (нет мест / событие не найдено и т.п.)
     /// </summary>
     public void Reject()
     {
+        if (Status is BookingStatus.Cancelled or BookingStatus.Rejected)
+        {
+            throw new DomainValidationException("Бронь уже завершена и не может быть отклонена");
+        }
+
         Status = BookingStatus.Rejected;
         ProcessedAt = DateTime.UtcNow;
     }
