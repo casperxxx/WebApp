@@ -9,12 +9,13 @@ namespace Bookings.Application;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет BookingService и фоновую обработку броней
+    /// Добавляет BookingService, фон Confirm и публикацию outbox
     /// </summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<IBookingService, BookingService>();
         services.AddHostedService<BookingBackgroundService>();
+        services.AddHostedService<OutboxPublisherService>();
         return services;
     }
 }

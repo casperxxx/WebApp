@@ -36,6 +36,9 @@ namespace Bookings.Infrastructure.DataAccess.Migrations
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Seats")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -51,6 +54,35 @@ namespace Bookings.Infrastructure.DataAccess.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("bookings", (string)null);
+                });
+
+            modelBuilder.Entity("Bookings.Domain.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("PublishedAtUtc");
+
+                    b.ToTable("outbox_messages", (string)null);
                 });
 #pragma warning restore 612, 618
         }

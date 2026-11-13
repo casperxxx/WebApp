@@ -8,9 +8,9 @@ using Shared.Contracts;
 namespace Bookings.Infrastructure.Messaging;
 
 /// <summary>
-/// Продюсер Kafka для BookingCancelled; ключ = EventId
+/// Продюсер Kafka для booking-events; ключ = EventId
 /// </summary>
-internal sealed class KafkaBookingCancelledPublisher : IBookingCancelledPublisher, IDisposable
+internal sealed class KafkaBookingEventPublisher : IBookingEventPublisher, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -18,11 +18,11 @@ internal sealed class KafkaBookingCancelledPublisher : IBookingCancelledPublishe
     };
 
     private readonly IProducer<string, string> _producer;
-    private readonly ILogger<KafkaBookingCancelledPublisher> _logger;
+    private readonly ILogger<KafkaBookingEventPublisher> _logger;
 
-    public KafkaBookingCancelledPublisher(
+    public KafkaBookingEventPublisher(
         IConfiguration configuration,
-        ILogger<KafkaBookingCancelledPublisher> logger)
+        ILogger<KafkaBookingEventPublisher> logger)
     {
         _logger = logger;
 
@@ -36,12 +36,12 @@ internal sealed class KafkaBookingCancelledPublisher : IBookingCancelledPublishe
         }).Build();
     }
 
-    public async Task PublishAsync(BookingCancelled message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(BookingLifecycleEvent message, CancellationToken cancellationToken = default)
     {
         var payload = JsonSerializer.Serialize(message, JsonOptions);
 
         var result = await _producer.ProduceAsync(
-            KafkaTopics.BookingCancelled,
+            KafkaTopics.BookingEvents,
             new Message<string, string>
             {
                 Key = message.EventId.ToString(),
@@ -50,10 +50,10 @@ internal sealed class KafkaBookingCancelledPublisher : IBookingCancelledPublishe
             cancellationToken);
 
         _logger.LogInformation(
-            "Отправлено BookingCancelled: BookingId={BookingId}, EventId={EventId}, partition={Partition}, offset={Offset}",
+            "Отправлено {Type}: BookingId={BookingId}, EventId={EventId}, offset={Offset}",
+            message.Type,
             message.BookingId,
             message.EventId,
-            result.Partition.Value,
             result.Offset.Value);
     }
 

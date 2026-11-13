@@ -4,7 +4,7 @@ using Bookings.Domain.Entities;
 namespace Bookings.Infrastructure.DataAccess;
 
 /// <summary>
-/// DbContext сервиса Bookings (только таблица bookings)
+/// DbContext сервиса Bookings (bookings + outbox)
 /// </summary>
 public sealed class BookingsDbContext : DbContext
 {
@@ -13,6 +13,9 @@ public sealed class BookingsDbContext : DbContext
     }
 
     public DbSet<Booking> Bookings => Set<Booking>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

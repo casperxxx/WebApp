@@ -15,7 +15,7 @@ namespace Bookings.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет DbContext, PostgreSQL, репозитории и Kafka-продюсер
+    /// Добавляет DbContext, репозитории, Kafka publisher и Rejected consumer
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -25,11 +25,11 @@ public static class DependencyInjection
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        // продюсеры один на приложение, при остановке Dispose
-        services.AddSingleton<IBookingConfirmedPublisher, KafkaBookingConfirmedPublisher>();
-        services.AddSingleton<IBookingCancelledPublisher, KafkaBookingCancelledPublisher>();
+        services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
+        services.AddHostedService<BookingRejectedConsumer>();
 
         return services;
     }
