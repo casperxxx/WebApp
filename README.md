@@ -1,176 +1,166 @@
-# WebApp
+# WebApp (sprint-9)
 
-API для событий и бронирований. Данные в PostgreSQL, схема через миграции EF Core (`Migrate()`).
+Микросервисный API событий и бронирований.  
+Три сервиса со своими PostgreSQL, общий JWT (выдаёт Users), связь Bookings ↔ Events через Kafka.
 
-Ссылка на репозиторий: https://github.com/casperxxx/WebApp  
-Ветка: sprint-8
-
-В спринте 8 добавлены пользователи, JWT и роли Admin / User.
+Репозиторий: https://github.com/casperxxx/WebApp  
+Ветка: `sprint-9`
 
 ## Структура решения
 
-Четыре проекта (зависимости только «внутрь»):
-
-- **WebApp.Domain** — сущности (`Event`, `Booking`, `User`), исключения
-- **WebApp.Application** — сервисы, интерфейсы репозиториев, DTO, фоновый сервис броней
-- **WebApp.Infrastructure** — DbContext, миграции, репозитории, хеш пароля, генерация JWT
-- **WebApp** — контроллеры, middleware ошибок, Swagger, `Program.cs`
-
-В `Program.cs` вызываются `AddApplication()` и `AddInfrastructure()`.  
-Application **не ссылается** на Infrastructure.
-
-## Как запустить
-
-1. Склонировать репозиторий
-2. Поднять PostgreSQL:
-
 ```
-docker compose up -d
+WebApp.sln
+├── Shared/Shared.Contracts     — BookingLifecycleEvent, BookingEventType, KafkaTopics
+├── Users/                      — Domain / Application / Infrastructure / Api (+ Tests)
+├── Events/                     — Domain / Application / Infrastructure / Api (+ Tests)
+└── Bookings/                   — Domain / Application / Infrastructure / Api (+ Tests)
 ```
 
-3. Собрать и запустить:
+В каждом сервисе зависимости только «внутрь» (Clean Architecture):  
+Api → Application + Infrastructure; Application → Domain (+ Shared.Contracts у Events/Bookings).
+
+| Сервис | Порт | БД (хост) | Назначение |
+|--------|------|-----------|------------|
+| Users | 5101 | `localhost:5434` / `users_db` | регистрация, login, JWT |
+| Events | 5102 | `localhost:5435` / `events_db` | CRUD событий, места, Kafka consumer |
+| Bookings | 5103 | `localhost:5436` / `bookings_db` | бронь / отмена, outbox, фон Confirm |
+
+Kafka: с хоста `localhost:9092`, внутри Docker `kafka:29092`.  
+Zookeeper: `2181` (как в ТЗ).
+
+## Как запустить (Docker)
 
 ```
-dotnet restore
-dotnet build
-dotnet run --project WebApp/WebApp.csproj
+docker compose up -d --build
 ```
 
-Приложение: http://localhost:5176  
-Swagger: http://localhost:5176/swagger
+Swagger:
+- http://localhost:5101/swagger — Users  
+- http://localhost:5102/swagger — Events  
+- http://localhost:5103/swagger — Bookings  
 
-При старте накатываются миграции (таблицы `events`, `bookings`, `users`).
+Остановка: `docker compose down`
 
-Строка подключения (`WebApp/appsettings.json`):
-
-```
-Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
-```
-
-Порт 5433 — чтобы не пересекаться с локальным Postgres на 5432.
-
-## Роли
-
-- **Admin** — создаёт / меняет / удаляет события, может смотреть и отменять любую бронь
-- **User** — бронирует события; смотрит и отменяет только свои брони
-
-Список событий (GET) доступен без токена.  
-Создание/изменение/удаление событий — только Admin (без токена 401, обычный пользователь 403).  
-Бронь и работа с `/bookings` — нужна аутентификация.
-
-Дополнительно при бронировании:
-- нельзя бронировать уже начавшееся событие (400)
-- не больше 10 активных броней на пользователя (Pending + Confirmed), иначе 409
-
-## JWT
-
-В `WebApp/appsettings.json` секция `Jwt` (Secret — плейсхолдер):
-
-```json
-"Jwt": {
-  "Secret": "CHANGE_ME_use_user_secrets_min_32_chars!!",
-  "Issuer": "WebApp",
-  "Audience": "WebApp",
-  "ExpirationMinutes": 60
-}
-```
-
-Секрет должен быть не короче 32 байт (UTF-8); при более коротком приложении не стартует.  
-Локально задайте свой ключ через User Secrets (не коммитьте в git):
+## Как запустить локально
 
 ```
-dotnet user-secrets set "Jwt:Secret" "ваш_секрет_не_короче_32_символов!!" --project WebApp/WebApp.csproj
+docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings
+dotnet build WebApp.sln
+dotnet run --project Users/Users.Api
+dotnet run --project Events/Events.Api
+dotnet run --project Bookings/Bookings.Api
 ```
-
-### Как получить токен в Swagger
-
-1. Открыть http://localhost:5176/swagger
-2. `POST /auth/register` — например:
-
-```json
-{
-  "login": "admin1",
-  "password": "password",
-  "role": "Admin"
-}
-```
-
-Роль можно не указывать — тогда будет User. Для проверки удобно зарегистрировать и Admin, и User.
-
-3. `POST /auth/login` — в ответе поле `token`
-4. Кнопка **Authorize** → вставить токен (часто в формате `Bearer <token>`)
-5. Дальше вызывать защищённые методы
-
-Проверка: без токена создать событие → 401; под User → 403; под Admin — можно создать событие, забронировать и отменить бронь.
-
-## Миграции
-
-```
-dotnet ef migrations add ИмяМиграции --project WebApp.Infrastructure --startup-project WebApp --output-dir DataAccess/Migrations
-```
-
-Применение: при запуске приложения или
-
-```
-dotnet ef database update --project WebApp.Infrastructure --startup-project WebApp
-```
-
-Есть `InitialCreate` и `AddUsersAndBookingUserId` (таблица users и поле UserId у броней).
 
 ## Тесты
 
 ```
-dotnet test
+dotnet test WebApp.sln
 ```
 
-Нужен запущенный Docker (Testcontainers для интеграционных тестов).
+- **Users.Tests** — домен User, AuthService (дубликат логина, неверный пароль)  
+- **Events.Tests** — места (TryReserveSeats / ReleaseSeats), ProcessedBooking  
+- **Bookings.Tests** — лимит 10, права на просмотр/отмену, outbox при Cancel Confirmed, Seats  
+- **Bookings.IntegrationTests** — PostgreSQL через Testcontainers: Confirm/Cancel + outbox в одной транзакции  
 
-- **WebApp.Tests** — сервисы, auth, проверки 401/403
-- **EventApi.IntegrationTests** — репозитории на PostgreSQL
+
+## Роли
+
+- **Admin** — CRUD событий; любая бронь  
+- **User** — свои брони  
+
+`GET /events` без токена. Запись событий — только Admin. Брони — с JWT.  
+Лимит: не больше **10** активных броней (`Pending` + `Confirmed`) на пользователя (409).
+
+## JWT
+
+Одинаковые `Jwt:Secret` / `Issuer` / `Audience` во всех сервисах. Секрет ≥ 32 байт UTF-8.
+
+### Токен в Swagger
+
+1. http://localhost:5101/swagger → `POST /auth/register` / `login`  
+2. Authorize на Events/Bookings: `Bearer <token>`
+
+```json
+{ "login": "admin1", "password": "password", "role": "Admin" }
+```
 
 ## API
 
-Auth (без токена):
-- POST /auth/register — 204 / 400
-- POST /auth/login — 200 (token) / 400
+### Users `:5101`
 
-События:
-- GET /events, GET /events/{id}
-- POST /events, PUT /events/{id}, DELETE /events/{id} — только Admin
-- POST /events/{id}/book — нужна аутентификация (202 / 400 / 401 / 404 / 409)
+| Метод | Путь | Ответ |
+|-------|------|-------|
+| POST | `/auth/register` | 204 / 400 |
+| POST | `/auth/login` | 200 (`token`) / 400 |
 
-Брони:
-- GET /bookings/{id} — нужна аутентификация
-- DELETE /bookings/{id} — отмена (своя или любая у Admin)
+### Events `:5102`
 
-### Параметры GET /events
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| GET | `/events`, `/events/{id}` | анонимно |
+| POST / PUT / DELETE | `/events`… | Admin |
 
-- title — поиск по названию
-- from / to — фильтр по датам
-- page (по умолчанию 1), pageSize (по умолчанию 10, максимум 100)
+Query: `title`, `from`, `to`, `page`, `pageSize`.
 
-Пример: `GET /events?title=встреча&from=2026-07-01&page=1&pageSize=5`
+### Bookings `:5103`
 
-## Модели (кратко)
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| POST | `/events/{id}/book` | JWT → 202 |
+| GET / DELETE | `/bookings/{id}` | владелец или Admin |
 
-Событие: id, title, description, startAt, endAt, totalSeats, availableSeats.
+## Модели
 
-Пользователь: id, login, passwordHash (SHA-256), role (User / Admin).
+- **Событие:** id, title, description, startAt, endAt, totalSeats, availableSeats  
+- **Пользователь:** id, login, passwordHash, role  
+- **Бронь:** id, eventId, userId, **seats**, status, createdAt, processedAt  
 
-Бронь: id, eventId, userId, status (Pending / Confirmed / Rejected / Cancelled), createdAt, processedAt.
+## Фон, outbox и Kafka
 
-## Фон и синхронизация
+Один топик **`booking-events`**, ключ сообщения = **EventId** (порядок Confirm → Cancel для одного события).
 
-`BookingBackgroundService` берёт Pending-брони, ждёт пару секунд и в нормальном пути ставит Confirmed.  
-Rejected и возврат места — в `catch` при ошибке обработки; если события уже нет — Reject без `ReleaseSeats`.  
-В `BookingService` для создания брони используется static `SemaphoreSlim` (вместо `lock`, потому что внутри есть `await`).
+| Type | Кто шлёт | Кто читает | Эффект |
+|------|----------|------------|--------|
+| `Confirmed` | Bookings (outbox) | Events | −места |
+| `Cancelled` | Bookings (outbox) | Events | +места (если уже списывали) |
+| `Rejected` | Events | Bookings | статус Rejected (нет мест / нет события / уже началось) |
+
+```
+Bookings                              Kafka booking-events                 Events
+────────                              --------------------                 ──────
+Pending → Confirm + outbox ──► OutboxPublisher → Confirmed ──► −seats
+                                                         нет мест ──► Rejected ──► Bookings Rejected
+Cancel Confirmed + outbox ──────────► Cancelled ──────────► +seats
+```
+
+- Outbox: бронь и сообщение в **одной транзакции**; публикация отдельным фоном  
+- Идемпотентность: `processed_bookings` / `processed_cancellations`  
+- При ошибке БД у consumer — **Seek** на то же смещение и повтор (offset вперёд не коммитится)  
+
+Посмотреть топик:
+
+```
+docker exec webapp-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic booking-events --from-beginning --timeout-ms 10000
+```
+
+## Миграции
+
+```
+dotnet ef migrations add Имя --project Users/Users.Infrastructure --startup-project Users/Users.Api --output-dir DataAccess/Migrations
+dotnet ef migrations add Имя --project Events/Events.Infrastructure --startup-project Events/Events.Api --output-dir DataAccess/Migrations
+dotnet ef migrations add Имя --project Bookings/Bookings.Infrastructure --startup-project Bookings/Bookings.Api --output-dir DataAccess/Migrations
+```
+
+Применение — при старте API.
 
 ## Ошибки
 
-Ответ в формате Problem Details (`application/problem+json`):
-- 400 — валидация, прошедшее событие, неверный логин/пароль
-- 401 — нет токена
-- 403 — нет прав
-- 404 — не найдено
-- 409 — нет мест или лимит броней
-- 500 — внутренняя ошибка
+Problem Details (`application/problem+json`): 400 / 401 / 403 / 404 / 409 / 500.
+
+## Сценарий проверки
+
+1. Register Admin → login → Authorize  
+2. `POST /events` (будущие даты, seats)  
+3. `POST /events/{id}/book` → через пару секунд Confirmed и `availableSeats − seats`  
+4. `DELETE /bookings/{id}` → места возвращаются  
+5. При брони на несуществующий eventId → после обработки статус **Rejected**  
