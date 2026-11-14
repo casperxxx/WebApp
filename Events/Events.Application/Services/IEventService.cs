@@ -31,6 +31,11 @@ public interface IEventService
     Task<EventResponse> GetEventAsync(Guid id);
 
     /// <summary>
+    /// Топ-10 популярных событий (Cache-Aside)
+    /// </summary>
+    Task<IReadOnlyList<EventResponse>> GetTopEventsAsync();
+
+    /// <summary>
     /// Создать событие из DTO
     /// </summary>
     /// <param name="request">Данные для создания события</param>

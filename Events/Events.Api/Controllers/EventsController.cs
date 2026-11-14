@@ -46,6 +46,18 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
+    /// Топ-10 популярных событий (по доле проданных мест)
+    /// </summary>
+    /// <response code="200">Список успешно получен</response>
+    [HttpGet("top")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(IReadOnlyList<EventResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<EventResponse>>> GetTop()
+    {
+        return Ok(await _eventService.GetTopEventsAsync());
+    }
+
+    /// <summary>
     /// Получить событие по Id
     /// </summary>
     /// <param name="id">Идентификатор события</param>

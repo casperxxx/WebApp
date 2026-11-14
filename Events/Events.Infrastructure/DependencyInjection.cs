@@ -35,7 +35,10 @@ public static class DependencyInjection
         // Redis: ConnectionMultiplexer — синглтон (дорогие соединения)
         var redisSection = configuration.GetSection(RedisCacheOptions.SectionName);
         services.Configure<RedisCacheOptions>(redisSection);
-        var redisConnection = redisSection["ConnectionString"] ?? "localhost:6379";
+        var redisOptions = new RedisCacheOptions();
+        redisSection.Bind(redisOptions);
+        services.AddSingleton(redisOptions);
+        var redisConnection = redisOptions.ConnectionString;
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect($"{redisConnection},abortConnect=false"));
         services.AddSingleton<ICacheService, RedisCacheService>();
