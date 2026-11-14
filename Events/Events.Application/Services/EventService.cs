@@ -1,3 +1,4 @@
+using Events.Application.Caching;
 using Events.Application.Models;
 using Events.Application.Repositories;
 using Events.Domain.Entities;
@@ -6,20 +7,30 @@ using Events.Domain.Exceptions;
 namespace Events.Application.Services;
 
 /// <summary>
-/// Сервис для работы с событиями
+/// Сервис для работы с событиями (Cache-Aside для GetById и Top)
 /// </summary>
 internal class EventService : IEventService
 {
+    private const int TopCount = 10;
+
     private readonly IEventRepository _eventRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cache;
+    private readonly RedisCacheOptions _cacheOptions;
 
     /// <summary>
-    /// Создаёт сервис и получает репозиторий через DI
+    /// Создаёт сервис и получает зависимости через DI
     /// </summary>
-    public EventService(IEventRepository eventRepository, IUnitOfWork unitOfWork)
+    public EventService(
+        IEventRepository eventRepository,
+        IUnitOfWork unitOfWork,
+        ICacheService cache,
+        RedisCacheOptions cacheOptions)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
+        _cache = cache;
+        _cacheOptions = cacheOptions;
     }
 
     /// <summary>
@@ -61,17 +72,43 @@ internal class EventService : IEventService
     }
 
     /// <summary>
-    /// Находит событие по Id
+    /// Находит событие по Id (Cache-Aside: Redis → БД → Redis)
     /// </summary>
     public async Task<EventResponse> GetEventAsync(Guid id)
     {
+        var cacheKey = CacheKeys.Event(id);
+        var cached = await _cache.GetAsync<EventResponse>(cacheKey);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
         var eventItem = await _eventRepository.GetByIdAsync(id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Событие с id {id} не найдено");
         }
 
-        return EventResponse.From(eventItem);
+        var response = EventResponse.From(eventItem);
+        await _cache.SetAsync(cacheKey, response, _cacheOptions.EventTtl);
+        return response;
+    }
+
+    /// <summary>
+    /// Топ-10 по доле проданных мест (Cache-Aside)
+    /// </summary>
+    public async Task<IReadOnlyList<EventResponse>> GetTopEventsAsync()
+    {
+        var cached = await _cache.GetAsync<List<EventResponse>>(CacheKeys.Top10);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var items = await _eventRepository.GetTopBySoldRatioAsync(TopCount);
+        var response = items.Select(EventResponse.From).ToList();
+        await _cache.SetAsync(CacheKeys.Top10, response, _cacheOptions.TopTtl);
+        return response;
     }
 
     /// <summary>
