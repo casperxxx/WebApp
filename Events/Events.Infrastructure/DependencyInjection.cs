@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Events.Application.Caching;
 using Events.Application.Messaging;
 using Events.Application.Repositories;
+using Events.Infrastructure.Caching;
 using Events.Infrastructure.DataAccess;
 using Events.Infrastructure.Messaging;
 using Events.Infrastructure.Repositories;
+using StackExchange.Redis;
 
 namespace Events.Infrastructure;
 
@@ -15,7 +18,7 @@ namespace Events.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Добавляет DbContext, репозитории, Kafka consumer/publisher
+    /// Добавляет DbContext, репозитории, Redis-кеш, Kafka consumer/publisher
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -28,6 +31,14 @@ public static class DependencyInjection
         services.AddScoped<IProcessedBookingRepository, ProcessedBookingRepository>();
         services.AddScoped<IProcessedCancellationRepository, ProcessedCancellationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Redis: ConnectionMultiplexer — синглтон (дорогие соединения)
+        var redisSection = configuration.GetSection(RedisCacheOptions.SectionName);
+        services.Configure<RedisCacheOptions>(redisSection);
+        var redisConnection = redisSection["ConnectionString"] ?? "localhost:6379";
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect($"{redisConnection},abortConnect=false"));
+        services.AddSingleton<ICacheService, RedisCacheService>();
 
         services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
         services.AddHostedService<KafkaTopicInitializer>();
