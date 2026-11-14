@@ -1,10 +1,11 @@
-# WebApp (sprint-9)
+# WebApp (sprint-10)
 
 Микросервисный API событий и бронирований.  
-Три сервиса со своими PostgreSQL, общий JWT (выдаёт Users), связь Bookings ↔ Events через Kafka.
+Три сервиса со своими PostgreSQL, общий JWT (выдаёт Users), связь Bookings ↔ Events через Kafka.  
+В Events — Redis Cache-Aside для `GET /events/{id}` и `GET /events/top`.
 
 Репозиторий: https://github.com/casperxxx/WebApp  
-Ветка: `sprint-9`
+Ветка: `sprint-10`
 
 ## Структура решения
 
@@ -26,7 +27,8 @@ Api → Application + Infrastructure; Application → Domain (+ Shared.Contracts
 | Bookings | 5103 | `localhost:5436` / `bookings_db` | бронь / отмена, outbox, фон Confirm |
 
 Kafka: с хоста `localhost:9092`, внутри Docker `kafka:29092`.  
-Zookeeper: `2181` (как в ТЗ).
+Zookeeper: `2181`  
+Redis: с хоста `localhost:6379`, внутри Docker `redis:6379` (кеш Events).
 
 ## Как запустить (Docker)
 
@@ -44,7 +46,7 @@ Swagger:
 ## Как запустить локально
 
 ```
-docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings
+docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings redis
 dotnet build WebApp.sln
 dotnet run --project Users/Users.Api
 dotnet run --project Events/Events.Api
@@ -58,7 +60,7 @@ dotnet test WebApp.sln
 ```
 
 - **Users.Tests** — домен User, AuthService (дубликат логина, неверный пароль)  
-- **Events.Tests** — места (TryReserveSeats / ReleaseSeats), ProcessedBooking  
+- **Events.Tests** — места (TryReserveSeats / ReleaseSeats), ProcessedBooking; Cache-Aside hit/miss/invalidate  
 - **Bookings.Tests** — лимит 10, права на просмотр/отмену, outbox при Cancel Confirmed, Seats  
 - **Bookings.IntegrationTests** — PostgreSQL через Testcontainers: Confirm/Cancel + outbox в одной транзакции  
 
@@ -97,10 +99,11 @@ dotnet test WebApp.sln
 
 | Метод | Путь | Доступ |
 |-------|------|--------|
-| GET | `/events`, `/events/{id}` | анонимно |
+| GET | `/events`, `/events/top`, `/events/{id}` | анонимно |
 | POST / PUT / DELETE | `/events`… | Admin |
 
-Query: `title`, `from`, `to`, `page`, `pageSize`.
+Query: `title`, `from`, `to`, `page`, `pageSize`.  
+`/events/top` — топ-10 по доле проданных мест `(total − available) / total`.
 
 ### Bookings `:5103`
 
@@ -114,6 +117,19 @@ Query: `title`, `from`, `to`, `page`, `pageSize`.
 - **Событие:** id, title, description, startAt, endAt, totalSeats, availableSeats  
 - **Пользователь:** id, login, passwordHash, role  
 - **Бронь:** id, eventId, userId, **seats**, status, createdAt, processedAt  
+
+## Redis-кеш (Events)
+
+Паттерн **Cache-Aside** через абстракцию `ICacheService` (реализация — StackExchange.Redis).  
+При ошибках Redis API не падает: лог + работаем как без кеша.
+
+| Ключ | Что | TTL (по умолчанию) | Инвалидация |
+|------|-----|--------------------|-------------|
+| `event:{id}` | одно событие | 300 с | после Create/Update/Delete и после списания/возврата мест в Kafka consumer |
+| `events:top10` | топ-10 популярных | 60 с | только TTL (не сбрасываем на каждую бронь) |
+
+Поток чтения: Redis → miss → PostgreSQL → Set в Redis.  
+Конфиг: секция `Redis` в `Events.Api/appsettings.json` / env в compose (`Redis__ConnectionString=redis:6379`).
 
 ## Фон, outbox и Kafka
 
@@ -161,6 +177,8 @@ Problem Details (`application/problem+json`): 400 / 401 / 403 / 404 / 409 / 500.
 
 1. Register Admin → login → Authorize  
 2. `POST /events` (будущие даты, seats)  
-3. `POST /events/{id}/book` → через пару секунд Confirmed и `availableSeats − seats`  
-4. `DELETE /bookings/{id}` → места возвращаются  
-5. При брони на несуществующий eventId → после обработки статус **Rejected**  
+3. `GET /events/{id}` дважды — второй раз из Redis (`docker exec webapp-redis redis-cli GET event:{id}`)  
+4. `GET /events/top` — ключ `events:top10`  
+5. `POST /events/{id}/book` → через пару секунд Confirmed и `availableSeats − seats` (кеш `event:{id}` сброшен)  
+6. `DELETE /bookings/{id}` → места возвращаются  
+7. При брони на несуществующий eventId → после обработки статус **Rejected**  

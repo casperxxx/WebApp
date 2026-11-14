@@ -127,6 +127,9 @@ internal class EventService : IEventService
         await _eventRepository.AddAsync(eventItem);
         await _unitOfWork.SaveChangesAsync();
 
+        // после записи в БД сбрасываем кеш (на create ключа обычно ещё нет)
+        await _cache.RemoveAsync(CacheKeys.Event(eventItem.Id));
+
         return EventResponse.From(eventItem);
     }
 
@@ -149,6 +152,7 @@ internal class EventService : IEventService
             request.TotalSeats ?? 0);
 
         await _unitOfWork.SaveChangesAsync();
+        await _cache.RemoveAsync(CacheKeys.Event(id));
 
         return EventResponse.From(existing);
     }
@@ -166,5 +170,6 @@ internal class EventService : IEventService
 
         _eventRepository.Delete(eventItem);
         await _unitOfWork.SaveChangesAsync();
+        await _cache.RemoveAsync(CacheKeys.Event(id));
     }
 }

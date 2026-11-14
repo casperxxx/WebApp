@@ -1,4 +1,4 @@
-# Инфраструктура + API сервисов sprint-9.
+# Инфраструктура + API сервисов (Users / Events / Bookings + Kafka + Redis).
 # Запуск: docker compose up -d --build
 # Остановка: docker compose down
 
