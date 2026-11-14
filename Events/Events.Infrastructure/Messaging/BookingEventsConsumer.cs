@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Events.Application.Caching;
 using Events.Application.Messaging;
 using Events.Application.Repositories;
 using Events.Domain.Entities;
@@ -185,6 +186,10 @@ internal sealed class BookingEventsConsumer : BackgroundService
         await processedBookings.AddAsync(ProcessedBooking.Create(message.BookingId), cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // места изменились — сбрасываем кеш события (топ живёт по TTL)
+        var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+        await cache.RemoveAsync(CacheKeys.Event(message.EventId), cancellationToken);
+
         _logger.LogInformation(
             "Списаны места по {BookingId}, событие {EventId}, available={Available}",
             message.BookingId,
@@ -206,12 +211,14 @@ internal sealed class BookingEventsConsumer : BackgroundService
             return;
         }
 
+        var seatsReleased = false;
         if (await processedBookings.ExistsAsync(message.BookingId, cancellationToken))
         {
             var eventItem = await eventRepository.GetByIdAsync(message.EventId, cancellationToken);
             if (eventItem is not null)
             {
                 eventItem.ReleaseSeats(message.Seats);
+                seatsReleased = true;
                 _logger.LogInformation(
                     "Возвращены места по отмене {BookingId}, available={Available}",
                     message.BookingId,
@@ -229,6 +236,12 @@ internal sealed class BookingEventsConsumer : BackgroundService
             ProcessedCancellation.Create(message.BookingId),
             cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (seatsReleased)
+        {
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.RemoveAsync(CacheKeys.Event(message.EventId), cancellationToken);
+        }
     }
 
     private Task PublishRejectedAsync(
