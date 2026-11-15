@@ -118,18 +118,27 @@ Query: `title`, `from`, `to`, `page`, `pageSize`.
 - **Пользователь:** id, login, passwordHash, role  
 - **Бронь:** id, eventId, userId, **seats**, status, createdAt, processedAt  
 
-## Redis-кеш (Events)
+## Кеширование (Redis)
 
-Паттерн **Cache-Aside** через абстракцию `ICacheService` (реализация — StackExchange.Redis).  
-При ошибках Redis API не падает: лог + работаем как без кеша.
+Паттерн **Cache-Aside** через абстракцию `ICacheService` (Application) и `RedisCacheService` (Infrastructure / StackExchange.Redis).  
+Ключи собраны в `CacheKeys`. `IConnectionMultiplexer` — singleton в DI (`abortConnect=false`).
 
-| Ключ | Что | TTL (по умолчанию) | Инвалидация |
-|------|-----|--------------------|-------------|
-| `event:{id}` | одно событие | 300 с | после Create/Update/Delete и после списания/возврата мест в Kafka consumer |
-| `events:top10` | топ-10 популярных | 60 с | только TTL (не сбрасываем на каждую бронь) |
+### Что кешируется и почему
 
-Поток чтения: Redis → miss → PostgreSQL → Set в Redis.  
-Конфиг: секция `Redis` в `Events.Api/appsettings.json` / env в compose (`Redis__ConnectionString=redis:6379`).
+| Ключ | Что | TTL | Стратегия |
+|------|-----|-----|-----------|
+| `event:{id}` | карточка события | **300 с** | **инвалидация при записи** (`Remove` после SaveChanges) |
+| `events:top10` | топ-10 по `(total − available) / total` | **60 с** | **только TTL** |
+
+- **Событие по id** часто меняется (CRUD Admin, места из Kafka). Устаревание заметно → после Update/Delete/Create и после Confirm/Cancel в consumer ключ удаляем. Порядок: сначала БД, потом кеш.
+- **Топ-10** — рейтинговый агрегат для главной; небольшое устаревание ок. Явный сброс на каждое бронирование избыточен.
+- **TTL:** 5 мин для карточки (баланс свежести и нагрузки), 1 мин для топа (виджет обновляется чаще без лишних DEL).
+
+### Недоступный Redis
+
+Ошибки Get/Set/Remove логируются и **не пробрасываются** клиенту — запрос идёт в PostgreSQL. API стартует даже если Redis ещё не готов.
+
+Конфиг: секция `Redis` в `Events.Api/appsettings.json`; в Docker — `Redis__ConnectionString=redis:6379` (имя сервиса в сети compose).
 
 ## Фон, outbox и Kafka
 
@@ -177,7 +186,7 @@ Problem Details (`application/problem+json`): 400 / 401 / 403 / 404 / 409 / 500.
 
 1. Register Admin → login → Authorize  
 2. `POST /events` (будущие даты, seats)  
-3. `GET /events/{id}` дважды — второй раз из Redis (`docker exec webapp-redis redis-cli GET event:{id}`)  
+3. `GET /events/{id}` дважды — второй раз из Redis (`docker exec eventapi-redis redis-cli GET event:{id}`)  
 4. `GET /events/top` — ключ `events:top10`  
 5. `POST /events/{id}/book` → через пару секунд Confirmed и `availableSeats − seats` (кеш `event:{id}` сброшен)  
 6. `DELETE /bookings/{id}` → места возвращаются  
