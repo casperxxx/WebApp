@@ -79,16 +79,16 @@ services:
 
   # Redis — кеш Events (sprint-10)
   redis:
-    image: redis:7-alpine
-    container_name: webapp-redis
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 10
 
   # БД сервиса Bookings
   postgres-bookings:
@@ -141,8 +141,9 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      # redis без healthy: API должен стартовать и работать, если Redis недоступен
       redis:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "5102:8080"
 
