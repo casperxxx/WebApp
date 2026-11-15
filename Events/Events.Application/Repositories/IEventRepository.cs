@@ -24,6 +24,11 @@ public interface IEventRepository
     Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Топ событий по доле проданных мест (total - available) / total
+    /// </summary>
+    Task<List<Event>> GetTopBySoldRatioAsync(int take, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Добавить событие в контекст (без SaveChanges)
     /// </summary>
     Task AddAsync(Event eventItem, CancellationToken cancellationToken = default);
