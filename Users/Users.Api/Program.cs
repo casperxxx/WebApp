@@ -3,11 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Formatting.Compact;
 using Users.Application;
 using Users.Api.Middleware;
 using Users.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// структурированные JSON-логи в консоль
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console(new CompactJsonFormatter()));
 
 // OpenTelemetry: трейсы → Jaeger (OTLP), метрики → /metrics (Prometheus)
 builder.Services.AddOpenTelemetry()
