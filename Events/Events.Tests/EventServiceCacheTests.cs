@@ -15,6 +15,8 @@ public class EventServiceCacheTests
     private readonly Mock<IEventRepository> _events = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ICacheService> _cache = new();
+    private readonly IEventCacheGate _gate = new EventCacheGate();
+    private readonly Mock<IEventCacheInvalidator> _invalidator = new();
 
     /// <summary>
     /// TTL как в appsettings (для проверки Set с нужным временем жизни)
@@ -29,7 +31,7 @@ public class EventServiceCacheTests
     /// Собираем сервис с моками репозитория и кеша
     /// </summary>
     private EventService CreateSut() =>
-        new(_events.Object, _uow.Object, _cache.Object, _options);
+        new(_events.Object, _uow.Object, _cache.Object, _gate, _invalidator.Object, _options);
 
     /// <summary>
     /// Вспомогательный метод: доменное событие для Arrange
@@ -163,15 +165,19 @@ public class EventServiceCacheTests
     }
 
     /// <summary>
-    /// После Update сбрасываем ключ event:{id}, чтобы не отдавать устаревшие данные
+    /// После Update: сначала SaveChanges, потом Invalidate (порядок через Callback)
     /// </summary>
     [Fact]
-    public async Task UpdateEventAsync_AfterSave_RemovesEventCacheKey()
+    public async Task UpdateEventAsync_AfterSave_InvalidatesInOrder()
     {
         var ev = CreateEvent();
+        var order = new List<string>();
         _events.Setup(r => r.GetByIdAsync(ev.Id, default)).ReturnsAsync(ev);
-        _uow.Setup(u => u.SaveChangesAsync(default)).Returns(Task.CompletedTask);
-        _cache.Setup(c => c.RemoveAsync(CacheKeys.Event(ev.Id), default))
+        _uow.Setup(u => u.SaveChangesAsync(default))
+            .Callback(() => order.Add("save"))
+            .Returns(Task.CompletedTask);
+        _invalidator.Setup(i => i.InvalidateEventAsync(ev.Id, default))
+            .Callback(() => order.Add("invalidate"))
             .Returns(Task.CompletedTask);
 
         var dto = new EventDTO
@@ -185,38 +191,44 @@ public class EventServiceCacheTests
 
         await CreateSut().UpdateEventAsync(ev.Id, dto);
 
-        // сначала БД, потом Remove — иначе можно вернуть старый кеш
-        _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
-        _cache.Verify(c => c.RemoveAsync(CacheKeys.Event(ev.Id), default), Times.Once);
+        Assert.Equal(new[] { "save", "invalidate" }, order);
     }
 
     /// <summary>
-    /// После Delete тоже удаляем ключ из Redis
+    /// После Delete: сначала SaveChanges, потом Invalidate
     /// </summary>
     [Fact]
-    public async Task DeleteEventAsync_AfterSave_RemovesEventCacheKey()
+    public async Task DeleteEventAsync_AfterSave_InvalidatesInOrder()
     {
         var ev = CreateEvent();
+        var order = new List<string>();
         _events.Setup(r => r.GetByIdAsync(ev.Id, default)).ReturnsAsync(ev);
-        _uow.Setup(u => u.SaveChangesAsync(default)).Returns(Task.CompletedTask);
-        _cache.Setup(c => c.RemoveAsync(CacheKeys.Event(ev.Id), default))
+        _uow.Setup(u => u.SaveChangesAsync(default))
+            .Callback(() => order.Add("save"))
+            .Returns(Task.CompletedTask);
+        _invalidator.Setup(i => i.InvalidateEventAsync(ev.Id, default))
+            .Callback(() => order.Add("invalidate"))
             .Returns(Task.CompletedTask);
 
         await CreateSut().DeleteEventAsync(ev.Id);
 
         _events.Verify(r => r.Delete(ev), Times.Once);
-        _cache.Verify(c => c.RemoveAsync(CacheKeys.Event(ev.Id), default), Times.Once);
+        Assert.Equal(new[] { "save", "invalidate" }, order);
     }
 
     /// <summary>
-    /// После Create вызываем Remove (ключа обычно ещё нет — это безопасно)
+    /// После Create вызываем Invalidate (ключа обычно ещё нет — это безопасно)
     /// </summary>
     [Fact]
-    public async Task CreateEventAsync_AfterSave_RemovesEventCacheKey()
+    public async Task CreateEventAsync_AfterSave_InvalidatesEventCache()
     {
+        var order = new List<string>();
         _events.Setup(r => r.AddAsync(It.IsAny<Event>(), default)).Returns(Task.CompletedTask);
-        _uow.Setup(u => u.SaveChangesAsync(default)).Returns(Task.CompletedTask);
-        _cache.Setup(c => c.RemoveAsync(It.IsAny<string>(), default))
+        _uow.Setup(u => u.SaveChangesAsync(default))
+            .Callback(() => order.Add("save"))
+            .Returns(Task.CompletedTask);
+        _invalidator.Setup(i => i.InvalidateEventAsync(It.IsAny<Guid>(), default))
+            .Callback(() => order.Add("invalidate"))
             .Returns(Task.CompletedTask);
 
         var dto = new EventDTO
@@ -229,6 +241,7 @@ public class EventServiceCacheTests
 
         var created = await CreateSut().CreateEventAsync(dto);
 
-        _cache.Verify(c => c.RemoveAsync(CacheKeys.Event(created.Id), default), Times.Once);
+        _invalidator.Verify(i => i.InvalidateEventAsync(created.Id, default), Times.Once);
+        Assert.Equal(new[] { "save", "invalidate" }, order);
     }
 }

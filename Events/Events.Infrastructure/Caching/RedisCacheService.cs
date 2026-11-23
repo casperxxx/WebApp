@@ -34,13 +34,17 @@ public sealed class RedisCacheService : ICacheService
         try
         {
             var db = _redis.GetDatabase();
-            var value = await db.StringGetAsync(key);
+            var value = await db.StringGetAsync(key).WaitAsync(cancellationToken);
             if (value.IsNullOrEmpty)
             {
                 return default;
             }
 
             return JsonSerializer.Deserialize<T>((string)value!, JsonOptions);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -56,7 +60,11 @@ public sealed class RedisCacheService : ICacheService
         {
             var db = _redis.GetDatabase();
             var json = JsonSerializer.Serialize(value, JsonOptions);
-            await db.StringSetAsync(key, json, ttl);
+            await db.StringSetAsync(key, json, ttl).WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -70,7 +78,11 @@ public sealed class RedisCacheService : ICacheService
         try
         {
             var db = _redis.GetDatabase();
-            await db.KeyDeleteAsync(key);
+            await db.KeyDeleteAsync(key).WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

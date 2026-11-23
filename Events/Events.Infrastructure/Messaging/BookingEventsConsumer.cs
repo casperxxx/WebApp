@@ -186,9 +186,9 @@ internal sealed class BookingEventsConsumer : BackgroundService
         await processedBookings.AddAsync(ProcessedBooking.Create(message.BookingId), cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // места изменились — сбрасываем кеш события (топ живёт по TTL)
-        var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
-        await cache.RemoveAsync(CacheKeys.Event(message.EventId), cancellationToken);
+        // места изменились — сбрасываем кеш под замком ключа (топ живёт по TTL)
+        var cacheInvalidator = scope.ServiceProvider.GetRequiredService<IEventCacheInvalidator>();
+        await cacheInvalidator.InvalidateEventAsync(message.EventId, cancellationToken);
 
         _logger.LogInformation(
             "Списаны места по {BookingId}, событие {EventId}, available={Available}",
@@ -239,8 +239,8 @@ internal sealed class BookingEventsConsumer : BackgroundService
 
         if (seatsReleased)
         {
-            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
-            await cache.RemoveAsync(CacheKeys.Event(message.EventId), cancellationToken);
+            var cacheInvalidator = scope.ServiceProvider.GetRequiredService<IEventCacheInvalidator>();
+            await cacheInvalidator.InvalidateEventAsync(message.EventId, cancellationToken);
         }
     }
 
