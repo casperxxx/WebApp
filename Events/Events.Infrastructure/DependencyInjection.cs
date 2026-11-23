@@ -38,9 +38,11 @@ public static class DependencyInjection
         var redisOptions = new RedisCacheOptions();
         redisSection.Bind(redisOptions);
         services.AddSingleton(redisOptions);
+        // короткие таймауты: при мёртвом Redis деградация за ~1с, а не 5–20с
         var redisConnection = redisOptions.ConnectionString;
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect($"{redisConnection},abortConnect=false"));
+            ConnectionMultiplexer.Connect(
+                $"{redisConnection},abortConnect=false,connectTimeout=1000,syncTimeout=1000,asyncTimeout=1000"));
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();

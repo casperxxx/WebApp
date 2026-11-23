@@ -29,4 +29,8 @@
     <ProjectReference Include="..\..\Shared\Shared.Contracts\Shared.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Events.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -121,7 +121,9 @@ Query: `title`, `from`, `to`, `page`, `pageSize`.
 ## Кеширование (Redis)
 
 Паттерн **Cache-Aside** через абстракцию `ICacheService` (Application) и `RedisCacheService` (Infrastructure / StackExchange.Redis).  
-Ключи собраны в `CacheKeys`. `IConnectionMultiplexer` — singleton в DI (`abortConnect=false`).
+Ключи собраны в `CacheKeys`. `IConnectionMultiplexer` — singleton в DI (`abortConnect=false`, `connectTimeout/syncTimeout/asyncTimeout=1000`).
+
+На промахе — `IEventCacheGate` (семафор по ключу): один поток ходит в БД, остальные ждут. Инвалидация (`IEventCacheInvalidator`) идёт под тем же замком, чтобы после Remove не записать устаревшие места поверх.
 
 ### Что кешируется и почему
 
@@ -136,7 +138,7 @@ Query: `title`, `from`, `to`, `page`, `pageSize`.
 
 ### Недоступный Redis
 
-Ошибки Get/Set/Remove логируются и **не пробрасываются** клиенту — запрос идёт в PostgreSQL. API стартует даже если Redis ещё не готов.
+Ошибки Get/Set/Remove логируются и **не пробрасываются** клиенту — запрос идёт в PostgreSQL. Короткие таймауты (~1 с) не дают запросу висеть 10–20 с. API стартует даже если Redis ещё не готов.
 
 Конфиг: секция `Redis` в `Events.Api/appsettings.json`; в Docker — `Redis__ConnectionString=redis:6379` (имя сервиса в сети compose).
 
