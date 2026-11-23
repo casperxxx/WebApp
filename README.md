@@ -1,11 +1,12 @@
-# WebApp (sprint-10)
+# WebApp (sprint-11)
 
 Микросервисный API событий и бронирований.  
 Три сервиса со своими PostgreSQL, общий JWT (выдаёт Users), связь Bookings ↔ Events через Kafka.  
-В Events — Redis Cache-Aside для `GET /events/{id}` и `GET /events/top`.
+В Events — Redis Cache-Aside для `GET /events/{id}` и `GET /events/top`.  
+Наблюдаемость: OpenTelemetry (метрики + трейсы), Serilog JSON, Prometheus, Jaeger, Grafana.
 
 Репозиторий: https://github.com/casperxxx/WebApp  
-Ветка: `sprint-10`
+Ветка: `sprint-11`
 
 ## Структура решения
 
@@ -28,7 +29,8 @@ Api → Application + Infrastructure; Application → Domain (+ Shared.Contracts
 
 Kafka: с хоста `localhost:9092`, внутри Docker `kafka:29092`.  
 Zookeeper: `2181`  
-Redis: с хоста `localhost:6379`, внутри Docker `redis:6379` (кеш Events).
+Redis: с хоста `localhost:6379`, внутри Docker `redis:6379` (кеш Events).  
+Мониторинг: Prometheus `:9090`, Jaeger UI `:16686` / OTLP `:4317`, Grafana `:3000`.
 
 ## Как запустить (Docker)
 
@@ -41,17 +43,24 @@ Swagger:
 - http://localhost:5102/swagger — Events  
 - http://localhost:5103/swagger — Bookings  
 
+Мониторинг:
+- http://localhost:9090 — Prometheus  
+- http://localhost:16686 — Jaeger  
+- http://localhost:3000 — Grafana (login `admin` / `admin`)  
+
 Остановка: `docker compose down`
 
 ## Как запустить локально
 
 ```
-docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings redis
+docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings redis jaeger prometheus grafana
 dotnet build WebApp.sln
 dotnet run --project Users/Users.Api
 dotnet run --project Events/Events.Api
 dotnet run --project Bookings/Bookings.Api
 ```
+
+Локально в `appsettings.json` OTLP по умолчанию `http://localhost:4317` (Jaeger). В Docker у Api задано `Otlp__Endpoint=http://jaeger:4317`.
 
 ## Тесты
 
@@ -117,6 +126,48 @@ Query: `title`, `from`, `to`, `page`, `pageSize`.
 - **Событие:** id, title, description, startAt, endAt, totalSeats, availableSeats  
 - **Пользователь:** id, login, passwordHash, role  
 - **Бронь:** id, eventId, userId, **seats**, status, createdAt, processedAt  
+
+## Наблюдаемость (sprint-11)
+
+Во всех трёх Api подключены OpenTelemetry и Serilog.
+
+| Сигнал | Что | Куда |
+|--------|-----|------|
+| Метрики | ASP.NET Core (latency / throughput / active) + runtime | scrape Prometheus с `/metrics` |
+| Трейсы | входящий HTTP, исходящий HTTP, EF Core (SQL) | Jaeger по OTLP gRPC `:4317` |
+| Логи | структурированный JSON (`CompactJsonFormatter`) | stdout контейнера / консоль |
+
+Имена сервисов в телеметрии: `users-api`, `events-api`, `bookings-api` (так же job’ы в Prometheus).
+
+### Как поднять стек мониторинга
+
+Входит в общий compose:
+
+```
+docker compose up -d --build
+```
+
+Файлы:
+- [`prometheus.yml`](prometheus.yml) — scrape `users-api:8080`, `events-api:8080`, `bookings-api:8080`, путь `/metrics`
+- [`grafana/provisioning/`](grafana/provisioning/) — datasource Prometheus + подключение дашбордов
+- [`grafana/dashboards/aspnet-overview.json`](grafana/dashboards/aspnet-overview.json) — дашборд **ASP.NET Core Overview**
+
+### Порты UI
+
+| Инструмент | URL | Примечание |
+|------------|-----|------------|
+| Prometheus | http://localhost:9090 | Status → Targets — все `*-api` должны быть **UP** |
+| Jaeger | http://localhost:16686 | сервисы `users-api` / `events-api` / `bookings-api`, спаны HTTP и SQL |
+| Grafana | http://localhost:3000 | `admin` / `admin`; дашборд с latency, throughput, active requests |
+
+Проверка метрик вручную: `http://localhost:5101/metrics`, `:5102/metrics`, `:5103/metrics`.
+
+На дашборде панели:
+- `http_server_request_duration_seconds` (p50 / p95 / p99)
+- `http_server_request_duration_seconds_count` (RPS)
+- `http_server_active_requests`
+
+Переменная `job` переключает сервис (`users-api` / `events-api` / `bookings-api`).
 
 ## Кеширование (Redis)
 
@@ -193,3 +244,7 @@ Problem Details (`application/problem+json`): 400 / 401 / 403 / 404 / 409 / 500.
 5. `POST /events/{id}/book` → через пару секунд Confirmed и `availableSeats − seats` (кеш `event:{id}` сброшен)  
 6. `DELETE /bookings/{id}` → места возвращаются  
 7. При брони на несуществующий eventId → после обработки статус **Rejected**  
+8. `GET /metrics` на `:5101` / `:5102` / `:5103` — текст Prometheus  
+9. Prometheus → Status → Targets — три job’а **UP**  
+10. Jaeger — трейсы `users-api` / `events-api` / `bookings-api` (HTTP + SQL)  
+11. Grafana — дашборд ASP.NET Core Overview с latency / throughput / active  
