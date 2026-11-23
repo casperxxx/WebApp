@@ -1,4 +1,4 @@
-# Инфраструктура + API сервисов (Users / Events / Bookings + Kafka + Redis).
+# Инфраструктура + API сервисов (Users / Events / Bookings + Kafka + Redis + мониторинг).
 # Запуск: docker compose up -d --build
 # Остановка: docker compose down
 
@@ -128,6 +128,7 @@ services:
       Jwt__Issuer: WebApp
       Jwt__Audience: WebApp
       Jwt__ExpirationMinutes: "60"
+      Otlp__Endpoint: http://jaeger:4317
 
   # API Events — http://localhost:5102
   events-api:
@@ -159,7 +160,7 @@ services:
       Redis__ConnectionString: redis:6379
       Redis__EventTtlSeconds: "300"
       Redis__TopTtlSeconds: "60"
-
+      Otlp__Endpoint: http://jaeger:4317
 
   # API Bookings — http://localhost:5103
   bookings-api:
@@ -185,8 +186,49 @@ services:
       Jwt__ExpirationMinutes: "60"
       Kafka__BootstrapServers: kafka:29092
       Kafka__RejectedConsumerGroup: bookings-service-rejected
+      Otlp__Endpoint: http://jaeger:4317
+
+  # Prometheus — сбор метрик с /metrics
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: eventapi-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - users-api
+      - events-api
+      - bookings-api
+
+  # Jaeger — UI трейсов + OTLP gRPC
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: eventapi-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  # Grafana — дашборды по метрикам Prometheus
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: eventapi-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   users_pgdata:
   events_pgdata:
   bookings_pgdata:
+  grafana-data:
