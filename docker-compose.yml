@@ -1,4 +1,4 @@
-# Инфраструктура + API сервисов sprint-9.
+# Инфраструктура + API сервисов (Users / Events / Bookings + Kafka + Redis).
 # Запуск: docker compose up -d --build
 # Остановка: docker compose down
 
@@ -77,6 +77,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis — кеш Events (sprint-10)
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # БД сервиса Bookings
   postgres-bookings:
     image: postgres:16-alpine
@@ -128,6 +141,9 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      # redis без healthy: API должен стартовать и работать, если Redis недоступен
+      redis:
+        condition: service_started
     ports:
       - "5102:8080"
 
@@ -140,6 +156,9 @@ services:
       Jwt__ExpirationMinutes: "60"
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerGroup: events-service
+      Redis__ConnectionString: redis:6379
+      Redis__EventTtlSeconds: "300"
+      Redis__TopTtlSeconds: "60"
 
 
   # API Bookings — http://localhost:5103

@@ -58,6 +58,19 @@ internal sealed class EventRepository : IEventRepository
         return await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<List<Event>> GetTopBySoldRatioAsync(int take, CancellationToken cancellationToken = default)
+    {
+        // популярность = доля проданных мест; TotalSeats=0 не делим
+        return await _context.Events
+            .OrderByDescending(e => e.TotalSeats == 0
+                ? 0
+                : (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .ThenByDescending(e => e.TotalSeats - e.AvailableSeats)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task AddAsync(Event eventItem, CancellationToken cancellationToken = default)
     {
         _context.Events.Add(eventItem);
